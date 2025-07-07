@@ -1,0 +1,26 @@
+{
+  "canisters": {
+    "hyv_backend": {
+      "main": "src/hyv_backend/main.mo",
+      "type": "motoko"
+    },
+    "hyv_frontend": {
+      "dependencies": [
+        "hyv_backend"
+      ],
+      "source": [
+        "src/hyv_frontend/dist"
+      ],
+      "type": "assets",
+      "workspace": "hyv_frontend"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
