@@ -41,17 +41,30 @@ export default function ModelUpload({ onUpload }) {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <h2>Upload AI Model</h2>
-      <input type="file" accept=".onnx,.pt,.pth,.pb,.h5,.bin" onChange={handleFileChange} />
-      {/* Metadata fields */}
-      <input type="text" placeholder="Model Name" value={metadata.name}
-        onChange={e => setMetadata({ ...metadata, name: e.target.value })} required />
-      {/* Format, Domain, Type dropdowns */}
-      {/* ...other metadata fields... */}
-      <button type="submit">Upload & Mint NFT</button>
-      {error && <div className="error">{error}</div>}
-      {cycleCost && <div className="cycle-cost">Cycle Cost: {cycleCost}</div>}
-    </form>
+    <div className="card">
+      <form onSubmit={handleSubmit}>
+        <h2 className="card-title">Upload AI Model</h2>
+        <input
+          type="file"
+          accept=".onnx,.pt,.pth,.pb,.h5,.bin"
+          onChange={handleFileChange}
+          className="form-control"
+        />
+        {/* Metadata fields */}
+        <input
+          type="text"
+          placeholder="Model Name"
+          value={metadata.name}
+          onChange={e => setMetadata({ ...metadata, name: e.target.value })}
+          required
+          className="form-control"
+        />
+        {/* Format, Domain, Type dropdowns */}
+        {/* ...other metadata fields... */}
+        <button type="submit" className="btn btn-primary btn-full">Upload & Mint NFT</button>
+        {error && <div className="error">{error}</div>}
+        {cycleCost && <div className="cycle-cost">Cycle Cost: {cycleCost}</div>}
+      </form>
+    </div>
   );
 }

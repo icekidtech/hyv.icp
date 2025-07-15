@@ -112,42 +112,42 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 text-gray-800">
-      <div className="container mx-auto p-8">
-        <header className="flex justify-between items-center mb-12 pb-4 border-b-2 border-hyv-medium-green">
-          <h1 className="text-4xl font-bold text-hyv-dark-green">Hyv Marketplace</h1>
+    <div className="app-container">
+      <div className="container">
+        <header className="header">
+          <h1 className="main-title">Hyv Marketplace</h1>
           {isAuthenticated ? (
-            <div className="flex items-center gap-4">
-              <p className="text-sm text-hyv-gray">Principal: {identity?.getPrincipal().toText().slice(0, 15)}...</p>
-              <button onClick={handleLogout} className="bg-hyv-gray hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">
+            <div className="user-actions">
+              <p className="user-info">Principal: {identity?.getPrincipal().toText().slice(0, 15)}...</p>
+              <button onClick={handleLogout} className="btn btn-secondary">
                 Logout
               </button>
             </div>
           ) : (
-            <button onClick={handleLogin} className="bg-hyv-medium-green hover:bg-hyv-light-green hover:text-hyv-dark-green text-white font-bold py-2 px-4 rounded">
+            <button onClick={handleLogin} className="btn btn-primary">
               Login with Internet Identity
             </button>
           )}
         </header>
 
         {!isAuthenticated ? (
-          <div className="text-center p-10 bg-white rounded-lg shadow-md">
-            <h2 className="text-2xl font-semibold text-hyv-dark-green">Welcome to Hyv</h2>
-            <p className="mt-2 text-hyv-gray">Please log in to generate, upload, and view synthetic datasets.</p>
+          <div className="welcome-card">
+            <h2 className="welcome-title">Welcome to Hyv</h2>
+            <p className="welcome-text">Please log in to generate, upload, and view synthetic datasets.</p>
           </div>
         ) : (
-          <main className="grid md:grid-cols-2 gap-12">
+          <main className="main-content">
             {/* Left Column */}
-            <div className="flex flex-col gap-8">
+            <div className="left-column">
               {/* Generate Dataset */}
-              <div className="bg-white p-6 rounded-lg shadow-md">
-                <h2 className="text-2xl font-bold text-hyv-medium-green mb-4">🧠 Generate Synthetic Data</h2>
+              <div className="card">
+                <h2 className="card-title">🧠 Generate Synthetic Data</h2>
                 <form onSubmit={handleGenerate}>
                   <textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     placeholder="Enter your data generation prompt..."
-                    className="w-full p-2 border rounded mb-4 h-24"
+                    className="form-control textarea"
                     disabled={loading}
                   />
                   <input
@@ -155,10 +155,10 @@ function App() {
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                     placeholder="Enter your OpenAI API Key (for MVP demo)"
-                    className="w-full p-2 border rounded mb-4"
+                    className="form-control"
                     disabled={loading}
                   />
-                  <button type="submit" disabled={loading} className="w-full bg-hyv-medium-green hover:bg-hyv-light-green hover:text-hyv-dark-green text-white font-bold py-2 px-4 rounded">
+                  <button type="submit" disabled={loading} className="btn btn-primary btn-full">
                     {loading ? "Generating..." : "Generate & Store"}
                   </button>
                 </form>
@@ -169,27 +169,27 @@ function App() {
             </div>
 
             {/* Right Column */}
-            <div className="flex flex-col gap-8">
+            <div className="right-column">
               {/* Dataset List */}
-              <div className="bg-white p-6 rounded-lg shadow-md">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-2xl font-bold text-hyv-medium-green">🏪 Marketplace Datasets</h2>
-                  <button onClick={fetchDatasets} disabled={loading} className="text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 py-1 px-3 rounded">
+              <div className="card">
+                <div className="card-header">
+                  <h2 className="card-title">🏪 Marketplace Datasets</h2>
+                  <button onClick={fetchDatasets} disabled={loading} className="btn btn-small">
                     {loading ? "Refreshing..." : "Refresh"}
                   </button>
                 </div>
-                <ul className="space-y-4">
+                <ul className="dataset-list">
                   {datasets.length > 0 ? (
                     datasets.map((dataset) => (
-                      <li key={Number(dataset.id)} className="border-l-4 border-hyv-light-green bg-gray-50 p-4 rounded">
-                        <h3 className="font-bold text-lg text-hyv-dark-green">{dataset.title}</h3>
-                        <p className="text-sm text-gray-600 my-1">{dataset.description}</p>
-                        <p className="text-xs text-hyv-gray">Tags: {dataset.tags.join(", ")}</p>
-                        <p className="text-xs text-gray-500 mt-2 font-mono break-all">Hash: {dataset.fileHash}</p>
+                      <li key={Number(dataset.id)} className="dataset-item">
+                        <h3 className="dataset-title">{dataset.title}</h3>
+                        <p className="dataset-description">{dataset.description}</p>
+                        <p className="dataset-tags">Tags: {dataset.tags.join(", ")}</p>
+                        <p className="dataset-hash">Hash: {dataset.fileHash}</p>
                       </li>
                     ))
                   ) : (
-                    <p className="text-hyv-gray">No datasets found. Generate one to get started!</p>
+                    <p className="no-data">No datasets found. Generate one to get started!</p>
                   )}
                 </ul>
               </div>
