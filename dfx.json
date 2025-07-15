@@ -4,9 +4,14 @@
       "main": "src/hyv_backend/main.mo",
       "type": "motoko"
     },
+    "hyv_generator": {
+      "main": "src/hyv_generator/main.mo",
+      "type": "motoko"
+    },
     "hyv_frontend": {
       "dependencies": [
-        "hyv_backend"
+        "hyv_backend",
+        "hyv_generator"
       ],
       "source": [
         "src/hyv_frontend/dist"
