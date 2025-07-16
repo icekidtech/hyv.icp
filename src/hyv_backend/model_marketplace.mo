@@ -2,84 +2,127 @@ import Nat "mo:base/Nat";
 import Text "mo:base/Text";
 import Principal "mo:base/Principal";
 import Blob "mo:base/Blob";
+import Array "mo:base/Array";
+import Option "mo:base/Option";
+import Time "mo:base/Time";
 
-type ModelFormat = { #ONNX; #PyTorch; #TensorFlow; #HuggingFace };
-type Domain = { #Healthcare; #Finance; #Vision; #NLP; #Other };
-type ModelType = { #Transformer; #CNN; #RNN; #DecisionTree; #Ensemble };
+actor ModelNFTMarketplace {
+  public type ModelFormat = { #ONNX; #PyTorch; #TensorFlow; #HuggingFace };
+  public type Domain = { #Healthcare; #Finance; #Vision; #NLP; #Other };
+  public type ModelType = { #Transformer; #CNN; #RNN; #DecisionTree; #Ensemble };
 
-type ModelMetadata = {
-  name: Text;
-  format: ModelFormat;
-  domain: Domain;
-  modelType: ModelType;
-  architecture: Text;
-  parameters: Nat;
-  performance: Text; // e.g., "accuracy: 0.92, latency: 50ms"
-  description: Text;
-};
-
-type PricingModel = { usageBased: Nat }; // price per call in SAGE tokens
-
-type RevenueShare = { creator: Nat; platform: Nat }; // e.g., 70/30
-
-type ModelNFT = {
-  id: Nat;
-  owner: Principal;
-  metadata: ModelMetadata;
-  pricing: PricingModel;
-  revenue: RevenueShare;
-  fileChunks: [Blob]; // Sharded model storage
-  mintedAt: Nat;
-};
-
-stable var models: [ModelNFT] = [];
-stable var nextId: Nat = 0;
-
-// Upload model (sharding if >50GB, here simplified)
-public func uploadModel(
-  metadata: ModelMetadata,
-  fileChunks: [Blob],
-  pricing: PricingModel
-) : async Nat {
-  let caller = Principal.fromActor(this);
-  let revenue = { creator = 70; platform = 30 };
-  let id = nextId;
-  nextId += 1;
-  let nft: ModelNFT = {
-    id;
-    owner = caller;
-    metadata;
-    pricing;
-    revenue;
-    fileChunks;
-    mintedAt = Nat.now();
+  public type ModelMetadata = {
+    name: Text;
+    format: ModelFormat;
+    domain: Domain;
+    modelType: ModelType;
+    architecture: Text;
+    parameters: Nat;
+    performance: Text;
+    description: Text;
   };
-  models := Array.append(models, [nft]);
-  return id;
-};
 
-// Mint NFT for uploaded model
-public query func getModelNFT(id: Nat) : async ?ModelNFT {
-  models.find(func(m) = m.id == id)
-};
+  public type PricingModel = { usageBased: Nat };
+  public type RevenueShare = { creator: Nat; platform: Nat };
+  
+  public type ModelNFT = {
+    id: Nat;
+    owner: Principal;
+    metadata: ModelMetadata;
+    pricing: PricingModel;
+    revenue: RevenueShare;
+    fileChunks: [Blob];
+    mintedAt: Int;
+  };
 
-// Search models by domain, type, or performance metric
-public query func searchModels(
-  ?domain: ?Domain,
-  ?modelType: ?ModelType,
-  ?performance: ?Text
-) : async [ModelNFT] {
-  models.filter(func(m) =
-    (switch(domain) { case null true; case (?d) m.metadata.domain == d }) and
-    (switch(modelType) { case null true; case (?t) m.metadata.modelType == t }) and
-    (switch(performance) { case null true; case (?p) Text.contains(m.metadata.performance, p) })
-  )
-};
+  // Stable variables for persistence across upgrades
+  private stable var models: [ModelNFT] = [];
+  private stable var nextId: Nat = 0;
 
-// List all models
-public query func listModels() : async [ModelNFT] {
-  models
-};
+  public func uploadModel(
+    metadata: ModelMetadata,
+    fileChunks: [Blob],
+    pricing: PricingModel
+  ) : async Nat {
+    let caller = Principal.fromActor(ModelNFTMarketplace);
+    let newModel: ModelNFT = {
+      id = nextId;
+      owner = caller;
+      metadata = metadata;
+      pricing = pricing;
+      revenue = { creator = 80; platform = 20 }; // Default revenue split
+      fileChunks = fileChunks;
+      mintedAt = Time.now();
+    };
+    
+    models := Array.append(models, [newModel]);
+    nextId += 1;
+    nextId - 1
+  };
 
-// Placeholder: SAGE token logic, cycles, Internet Identity integration
-// These would use ICP ledger and cycles APIs in full implementation
+  public query func getModelNFT(id: Nat) : async ?ModelNFT {
+    Array.find<ModelNFT>(models, func(model) = model.id == id)
+  };
+
+  public query func searchModels(
+    domain: ?Domain,
+    modelType: ?ModelType,
+    performance: ?Text
+  ) : async [ModelNFT] {
+    Array.filter<ModelNFT>(models, func(model) {
+      let domainMatch = switch (domain) {
+        case null { true };
+        case (?d) { model.metadata.domain == d };
+      };
+      
+      let typeMatch = switch (modelType) {
+        case null { true };
+        case (?t) { model.metadata.modelType == t };
+      };
+      
+      let performanceMatch = switch (performance) {
+        case null { true };
+        case (?p) { Text.contains(model.metadata.performance, #text p) };
+      };
+      
+      domainMatch and typeMatch and performanceMatch
+    })
+  };
+
+  public query func listModels() : async [ModelNFT] {
+    models
+  };
+
+  public query func getTotalModels() : async Nat {
+    models.size()
+  };
+
+  public func transferModel(id: Nat, newOwner: Principal) : async Bool {
+    let caller = Principal.fromActor(ModelNFTMarketplace);
+    
+    switch (Array.find<ModelNFT>(models, func(model) = model.id == id)) {
+      case null { false };
+      case (?model) {
+        if (model.owner == caller) {
+          let updatedModel = {
+            id = model.id;
+            owner = newOwner;
+            metadata = model.metadata;
+            pricing = model.pricing;
+            revenue = model.revenue;
+            fileChunks = model.fileChunks;
+            mintedAt = model.mintedAt;
+          };
+          
+          models := Array.map<ModelNFT, ModelNFT>(models, func(m) {
+            if (m.id == id) { updatedModel } else { m }
+          });
+          
+          true
+        } else {
+          false
+        }
+      };
+    }
+  };
+}
