@@ -1,0 +1,171 @@
+.main {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+.icon {
+  height: 1.25rem;
+  width: 1.25rem;
+  color: var(--primary);
+}
+
+.heroTitle {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  line-height: 1.2;
+}
+
+.heroHighlight {
+  color: var(--primary);
+}
+
+.heroSubtitle {
+  color: var(--muted);
+  max-width: 48rem;
+  margin-bottom: 2rem;
+  font-size: 1.125rem;
+  line-height: 1.75;
+}
+
+.sectionTitle {
+  font-size: 1.875rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+/* Marketplace Section */
+.marketplaceGrid {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  gap: 1.5rem;
+  margin-top: 3rem;
+}
+
+.datasetCard {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  transition: transform 0.2s ease-in-out;
+}
+
+.datasetCard:hover {
+  transform: translateY(-4px);
+}
+
+.datasetImage {
+  height: 10rem;
+  background: linear-gradient(90deg, rgba(15, 157, 88, 0.1), rgba(15, 157, 88, 0.05));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.datasetContent {
+  padding: 1.5rem;
+}
+
+.datasetHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.datasetTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.badge {
+  background-color: rgba(15, 157, 88, 0.1);
+  color: var(--primary);
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+}
+
+.datasetDescription {
+  color: var(--muted-foreground);
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.datasetFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.datasetAuthor {
+  color: var(--muted-foreground);
+}
+
+.datasetPrice {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+/* CTA Section */
+.ctaSection {
+  background: linear-gradient(90deg, rgba(15, 157, 88, 0.1), rgba(15, 157, 88, 0.05));
+  padding: 5rem 1rem;
+  text-align: center;
+}
+
+.ctaContent {
+  max-width: 48rem;
+  margin: 0 auto;
+}
+
+.ctaTitle {
+  font-size: 2.25rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  line-height: 1.2;
+}
+
+.ctaDescription {
+  color: var(--muted-foreground);
+  font-size: 1.125rem;
+  line-height: 1.75;
+  margin-bottom: 2rem;
+  max-width: 42rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.ctaNote {
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+  margin-top: 1rem;
+}
+
+/* Responsive styles */
+@media (min-width: 768px) {
+  .heroTitle {
+    font-size: 3.5rem;
+  }
+  .marketplaceGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .ctaTitle {
+    font-size: 3rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .heroTitle {
+    font-size: 4.5rem;
+  }
+  .ctaTitle {
+    font-size: 3.75rem;
+  }
+}
