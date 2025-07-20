@@ -4,6 +4,7 @@ import { Actor, HttpAgent } from "@dfinity/agent";
 import ModelUpload from "./components/ModelUpload";
 import ModelGrid from "./components/ModelGrid";
 import ModelSearch from "./components/ModelSearch";
+import LandingPage from "./components/LandingPage";
 import { hyv_backend } from "declarations/hyv_backend";
 
 // Placeholder factories if you haven't deployed yet
@@ -11,6 +12,7 @@ const backendIdl = ({ IDL }) => IDL.Service({});
 const backendCanisterId = process.env.CANISTER_ID_HYV_BACKEND;
 
 function App() {
+  const [showLanding, setShowLanding] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authClient, setAuthClient] = useState(null);
   const [identity, setIdentity] = useState(null);
@@ -117,14 +119,19 @@ function App() {
     setGeneratedData(dataset);
   };
 
+  // Show landing page first, then main app
+  if (showLanding) {
+    return <LandingPage onEnterApp={() => setShowLanding(false)} />;
+  }
+
   return (
     <div className="app-container">
-      <div className="container">
-        <header className="header">
-          <h1 className="main-title">Hyv Marketplace</h1>
+      <div className="app-header">
+        <h1 className="app-title">🧠 Hyv - Synthetic Data Marketplace</h1>
+        <div className="auth-section">
           {isAuthenticated ? (
-            <div className="user-actions">
-              <p className="user-info">Principal: {identity?.getPrincipal().toText().slice(0, 15)}...</p>
+            <div className="user-info">
+              <span className="user-greeting">Welcome! 👋</span>
               <button onClick={handleLogout} className="btn btn-secondary">
                 Logout
               </button>
@@ -134,95 +141,99 @@ function App() {
               Login with Internet Identity
             </button>
           )}
-        </header>
+        </div>
+      </div>
 
-        {!isAuthenticated ? (
-          <div className="welcome-card">
-            <h2 className="welcome-title">Welcome to Hyv</h2>
-            <p className="welcome-text">Please log in to generate, upload, and view synthetic datasets.</p>
+      {isAuthenticated && (
+        <main className="main-content">
+          <div className="left-column">
+            {/* Data Generation */}
+            <div className="card">
+              <div className="card-header">
+                <h2 className="card-title">🤖 Generate Synthetic Data</h2>
+              </div>
+              <div className="form-group">
+                <label htmlFor="prompt">Prompt:</label>
+                <textarea
+                  id="prompt"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder="Enter your data generation prompt..."
+                  className="textarea"
+                  rows={4}
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="apiKey">OpenAI API Key:</label>
+                <input
+                  id="apiKey"
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="Enter your OpenAI API key"
+                  className="input"
+                />
+              </div>
+              <button
+                onClick={handleGenerateData}
+                disabled={loading || !prompt.trim() || !apiKey.trim()}
+                className="btn btn-primary btn-full"
+              >
+                {loading ? "Generating..." : "Generate Data"}
+              </button>
+            </div>
+
+            {/* Model Upload */}
+            <ModelUpload onUpload={handleModelUpload} />
+          </div>
+
+          <div className="right-column">
+            {/* Dataset List */}
+            <div className="card">
+              <div className="card-header">
+                <h2 className="card-title">🏪 Marketplace Datasets</h2>
+                <button onClick={fetchDatasets} disabled={loading} className="btn btn-small">
+                  {loading ? "Refreshing..." : "Refresh"}
+                </button>
+              </div>
+              <ul className="dataset-list">
+                {datasets.length > 0 ? (
+                  datasets.map((dataset) => (
+                    <li key={Number(dataset.id)} className="dataset-item">
+                      <h3 className="dataset-title">{dataset.title}</h3>
+                      <p className="dataset-description">{dataset.description}</p>
+                      <p className="dataset-tags">Tags: {dataset.tags.join(", ")}</p>
+                      <p className="dataset-hash">Hash: {dataset.fileHash}</p>
+                    </li>
+                  ))
+                ) : (
+                  <p className="no-data">No datasets found. Generate one to get started!</p>
+                )}
+              </ul>
+            </div>
+
+            {/* Model Search and Grid */}
+            <ModelSearch onSearch={handleSearch} />
+            <ModelGrid models={models} />
+          </div>
+        </main>
+      )}
+
+      {/* New section for displaying generated data */}
+      <div className="mt-8 p-4 border rounded">
+        <h2 className="text-xl font-bold mb-4">Generated Data</h2>
+        {generatedData ? (
+          <div>
+            <p><strong>Title:</strong> {generatedData.title}</p>
+            <p><strong>Description:</strong> {generatedData.description}</p>
+            <p><strong>Tags:</strong> {generatedData.tags.join(', ')}</p>
+            <p className="mt-2"><strong>Content:</strong></p>
+            <pre className="bg-gray-100 p-2 rounded">{generatedData.content}</pre> {/* ✅ Display raw text */}
+            <p className="mt-2"><strong>Hash:</strong> {generatedData.fileHash}</p>
           </div>
         ) : (
-          <main className="main-content">
-            {/* Left Column */}
-            <div className="left-column">
-              {/* Generate Dataset */}
-              <div className="card">
-                <h2 className="card-title">🧠 Generate Synthetic Data</h2>
-                <form onSubmit={handleGenerate}>
-                  <textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Enter your data generation prompt..."
-                    className="form-control textarea"
-                    disabled={loading}
-                  />
-                  <input
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="Enter your OpenAI API Key (for MVP demo)"
-                    className="form-control"
-                    disabled={loading}
-                  />
-                  <button type="submit" disabled={loading} className="btn btn-primary btn-full">
-                    {loading ? "Generating..." : "Generate & Store"}
-                  </button>
-                </form>
-              </div>
-
-              {/* Upload Model */}
-              <ModelUpload onUpload={handleUpload} />
-            </div>
-
-            {/* Right Column */}
-            <div className="right-column">
-              {/* Dataset List */}
-              <div className="card">
-                <div className="card-header">
-                  <h2 className="card-title">🏪 Marketplace Datasets</h2>
-                  <button onClick={fetchDatasets} disabled={loading} className="btn btn-small">
-                    {loading ? "Refreshing..." : "Refresh"}
-                  </button>
-                </div>
-                <ul className="dataset-list">
-                  {datasets.length > 0 ? (
-                    datasets.map((dataset) => (
-                      <li key={Number(dataset.id)} className="dataset-item">
-                        <h3 className="dataset-title">{dataset.title}</h3>
-                        <p className="dataset-description">{dataset.description}</p>
-                        <p className="dataset-tags">Tags: {dataset.tags.join(", ")}</p>
-                        <p className="dataset-hash">Hash: {dataset.fileHash}</p>
-                      </li>
-                    ))
-                  ) : (
-                    <p className="no-data">No datasets found. Generate one to get started!</p>
-                  )}
-                </ul>
-              </div>
-
-              {/* Model Search and Grid */}
-              <ModelSearch onSearch={handleSearch} />
-              <ModelGrid models={models} />
-            </div>
-          </main>
+          <p>No data generated yet</p>
         )}
-
-        {/* New section for displaying generated data */}
-        <div className="mt-8 p-4 border rounded">
-          <h2 className="text-xl font-bold mb-4">Generated Data</h2>
-          {generatedData ? (
-            <div>
-              <p><strong>Title:</strong> {generatedData.title}</p>
-              <p><strong>Description:</strong> {generatedData.description}</p>
-              <p><strong>Tags:</strong> {generatedData.tags.join(', ')}</p>
-              <p className="mt-2"><strong>Content:</strong></p>
-              <pre className="bg-gray-100 p-2 rounded">{generatedData.content}</pre> {/* ✅ Display raw text */}
-              <p className="mt-2"><strong>Hash:</strong> {generatedData.fileHash}</p>
-            </div>
-          ) : (
-            <p>No data generated yet</p>
-          )}
-        </div>
       </div>
     </div>
   );
