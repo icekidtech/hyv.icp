@@ -23,6 +23,7 @@ function App() {
 
   const [models, setModels] = useState([]);
   const [searchParams, setSearchParams] = useState({});
+  const [generatedData, setGeneratedData] = useState(null); // New state for generated data
 
   // Authentication
   useEffect(() => {
@@ -110,6 +111,11 @@ function App() {
     const model = await hyv_backend.getModelNFT(id);
     setModels((prev) => [...prev, model]);
   }
+
+  const fetchDataset = async (id) => {
+    const dataset = await backendActor.getDataset(id); // Ensure this function exists
+    setGeneratedData(dataset);
+  };
 
   return (
     <div className="app-container">
@@ -200,6 +206,23 @@ function App() {
             </div>
           </main>
         )}
+
+        {/* New section for displaying generated data */}
+        <div className="mt-8 p-4 border rounded">
+          <h2 className="text-xl font-bold mb-4">Generated Data</h2>
+          {generatedData ? (
+            <div>
+              <p><strong>Title:</strong> {generatedData.title}</p>
+              <p><strong>Description:</strong> {generatedData.description}</p>
+              <p><strong>Tags:</strong> {generatedData.tags.join(', ')}</p>
+              <p className="mt-2"><strong>Content:</strong></p>
+              <pre className="bg-gray-100 p-2 rounded">{generatedData.content}</pre> {/* ✅ Display raw text */}
+              <p className="mt-2"><strong>Hash:</strong> {generatedData.fileHash}</p>
+            </div>
+          ) : (
+            <p>No data generated yet</p>
+          )}
+        </div>
       </div>
     </div>
   );

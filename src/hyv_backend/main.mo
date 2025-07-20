@@ -7,7 +7,6 @@ import Text "mo:base/Text";
 import Iter "mo:base/Iter";
 import Blob "mo:base/Blob";
 import Array "mo:base/Array";
-import Option "mo:base/Option";
 
 actor Main {
   // Model marketplace types (moved from module to avoid non-static expression error)
@@ -49,8 +48,9 @@ actor Main {
     description: Text;
     tags: [Text];
     uploader: Principal;
-    fileHash: Text; // SHA256 hash of the data
+    fileHash: Text; // Keep the hash for verification
     uploadDate: Int;
+    content: Text; // ✅ New field to store generated text
   };
 
   // Stable variables to persist data across upgrades
@@ -64,7 +64,7 @@ actor Main {
 
   // Define the public interface (actor type) for the generator canister.
   type Generator = actor {
-    generateText: (prompt: Text, openAiApiKey: Text) -> async Text;
+    generateText: (prompt: Text) -> async Text;
   };
 
   // A private helper function to hash text using a simple hash.
@@ -76,37 +76,35 @@ actor Main {
   };
 
   // A new public function to orchestrate the AI generation and storage.
-  public func generateAndStoreDataset(prompt: Text, apiKey: Text) : async DatasetId {
-    // For MVP, we'll create a generator reference dynamically
-    // In production, this would be a fixed canister ID
-    try {
-      let generator: Generator = actor("rdmx6-jaaaa-aaaah-qdrqq-cai"); // Placeholder ID
-      
-      // Step A: Call the generator canister to get the synthetic text.
-      let generated_text = await generator.generateText(prompt, apiKey);
+  public func generateAndStoreDataset(prompt: Text) : async DatasetId {
+    // Call the generator canister without exposing API key
+    let generator = await getGeneratorActor();
+    let response = await generator.generateText(prompt); // 🔄 This is the raw generated text
+    
+    let title = "Generated Dataset " # Nat.toText(nextId);
+    let description = "Synthetic data generated from prompt: " # prompt;
+    let tags = ["synthetic", "generated"];
+    let fileHash = hashText(response); // Keep the hash for verification
+    
+    return await uploadDataset(title, description, tags, fileHash, response); // ✅ Pass raw text
+  };
 
-      // Step B: Hash the generated text for verification.
-      let generated_hash = hashText(generated_text);
-
-      // Step C: Create metadata for the new dataset.
-      let title = "AI Generated: " # prompt;
-      let description = "This dataset was generated from a prompt using the Hyv AI Generator.";
-      let tags = ["generated", "ai-synthetic"];
-
-      // Step D: Call our existing uploadDataset function to save the new dataset.
-      return await uploadDataset(title, description, tags, generated_hash);
-    } catch (_) {
-      // For MVP, create a mock dataset if generator fails
-      let mock_hash = hashText("Generated from: " # prompt);
-      let title = "AI Generated: " # prompt;
-      let description = "Mock dataset generated from prompt.";
-      let tags = ["generated", "mock"];
-      return await uploadDataset(title, description, tags, mock_hash);
-    };
+  // Helper function to get the generator actor
+  private func getGeneratorActor() : async Generator {
+    // Get the generator canister ID from the dfx environment
+    // This will be set during deployment
+    let generatorCanisterId = "uzt4z-lp777-77774-qaabq-cai"; // Updated with correct generator ID
+    return actor(generatorCanisterId) : Generator;
   };
 
   // Public function to upload metadata for a new dataset
-  public func uploadDataset(title: Text, description: Text, tags: [Text], fileHash: Text) : async DatasetId {
+  public func uploadDataset(
+    title: Text, 
+    description: Text, 
+    tags: [Text], 
+    fileHash: Text, 
+    content: Text // ✅ New parameter
+  ) : async DatasetId {
     let caller = Principal.fromActor(Main);
     let timestamp = Time.now();
 
@@ -118,6 +116,7 @@ actor Main {
       uploader = caller;
       fileHash = fileHash;
       uploadDate = timestamp;
+      content = content; // ✅ Store raw text
     };
 
     datasets.put(nextId, new_dataset);
@@ -193,7 +192,12 @@ actor Main {
     })
   };
 
-  // System functions for upgrade persistence
+  // In hyv_backend/main.mo
+  public query func getDataset(id: DatasetId) : async ?Dataset {
+    return datasets.get(id);
+  };
+
+  // System functions for upgrade persistence - MUST be at the end
   system func preupgrade() {
     // Convert HashMap to stable array for persistence
     datasetsEntries := Iter.toArray(datasets.entries());
