@@ -86,7 +86,7 @@ actor Main {
       return await uploadDataset(title, description, tags, fileHash, response);
     } else {
       let title = "Synthetic Dataset #" # Nat.toText(nextId);
-      let description = "High-quality synthetic training data generated from: " # Text.take(prompt, 100) # "...";
+      let description = "High-quality synthetic training data generated from: " # truncateText(prompt, 100) # "...";
       let tags = ["synthetic", "ai-generated", "training-data", "verified"];
       let fileHash = hashText(response);
       
@@ -183,7 +183,27 @@ actor Main {
     Array.filter(models, func(m: ModelNFT) : Bool =
       (switch(domain) { case null true; case (?d) m.metadata.domain == d }) and
       (switch(modelType) { case null true; case (?t) m.metadata.modelType == t }) and
-      (switch(performance) { case null true; case (?p) Text.contains(m.metadata.performance, p) })
+      (switch(performance) { case null true; case (?p) Text.contains(m.metadata.performance, #text p) })
     )
   };
+
+    // Add the truncateText helper function (if it doesn't exist)
+    private func truncateText(text: Text, maxLength: Nat) : Text {
+        if (Text.size(text) <= maxLength) {
+            return text;
+        };
+        
+        var result = "";
+        var count = 0;
+        
+        for (char in Text.toIter(text)) {
+            if (count >= maxLength) {
+                return result;
+            };
+            result := result # Text.fromChar(char);
+            count += 1;
+        };
+        
+        result;
+    };
 }

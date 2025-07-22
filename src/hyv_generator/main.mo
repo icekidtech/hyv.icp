@@ -5,6 +5,9 @@ import Nat64 "mo:base/Nat64";
 import Debug "mo:base/Debug";
 import Option "mo:base/Option";
 import Result "mo:base/Result";
+import Time "mo:base/Time";
+import Int "mo:base/Int";
+import Iter "mo:base/Iter";
 
 actor Generator {
     // HTTP request and response types for IC HTTP outcalls
@@ -56,8 +59,8 @@ actor Generator {
             headers = [
                 ("Authorization", "Bearer " # apiKey),
                 ("Content-Type", "application/json"),
-                ("HTTP-Referer", "http://u6s2n-gx777-77774-qaaba-cai.localhost:4943/"),// Fix with playground link domain
-                ("X-Title", "Hyv AI Data Marketplace") // Optional but recommended
+                ("HTTP-Referer", "http://u6s2n-gx777-77774-qaaba-cai.localhost:4943/"),
+                ("X-Title", "Hyv AI Data Marketplace")
             ];
             body = ?Text.encodeUtf8(jsonBody);
             transform = null;
@@ -71,7 +74,8 @@ actor Generator {
             
             switch(Text.decodeUtf8(response.body)) {
                 case (?decoded) {
-                    Debug.print("Response received: " # Text.take(decoded, 200) # "...");
+                    // Use custom function to truncate response for debugging
+                    Debug.print("Response received: " # truncateText(decoded, 200) # "...");
                     
                     if (response.status == 200) {
                         let extractedContent = parseOpenRouterResponse(decoded);
@@ -80,7 +84,7 @@ actor Generator {
                         } else {
                             return "=== SYNTHETIC TRAINING DATA ===\n\n" # 
                                    "Generated from prompt: " # prompt # "\n" #
-                                   "Timestamp: " # debug_timestamp() # "\n" #
+                                   "Timestamp: " # debugTimestamp() # "\n" #
                                    "Data quality: High-fidelity synthetic\n\n" #
                                    "--- DATA START ---\n" #
                                    extractedContent # "\n" #
@@ -91,7 +95,7 @@ actor Generator {
                         Debug.print("HTTP Error: " # Nat.toText(response.status));
                         return "Error: API request failed with status " # Nat.toText(response.status) # 
                                ". Please check your API key and try again.";
-                    }
+                    };
                 };
                 case null {
                     return "Error: Could not decode API response";
@@ -117,55 +121,72 @@ actor Generator {
         result := Text.replace(result, #text "\n", "\\n");
         result := Text.replace(result, #text "\r", "\\r");
         result := Text.replace(result, #text "\t", "\\t");
-        result
+        result;
     };
 
-    // Enhanced JSON response parser for OpenRouter
+    // Helper function to truncate text (replaces Text.take)
+    private func truncateText(text: Text, maxLength: Nat) : Text {
+        if (Text.size(text) <= maxLength) {
+            return text;
+        };
+        
+        var result = "";
+        var count = 0;
+        
+        for (char in Text.toIter(text)) {
+            if (count >= maxLength) {
+                return result;
+            };
+            result := result # Text.fromChar(char);
+            count += 1;
+        };
+        
+        result;
+    };
+
+    // Enhanced JSON response parser for OpenRouter using Text.contains and pattern matching
     private func parseOpenRouterResponse(response: Text) : Text {
         Debug.print("Parsing response...");
         
-        // Look for the content field in the JSON response
-        switch (Text.split(response, #text "\"content\":")) {
-            case (#next(_, rest)) {
-                // Find the start of the content string
-                switch (Text.split(rest, #text "\"")) {
-                    case (#next(_, contentStart)) {
-                        // Find the end of the content (before the next quote that's not escaped)
-                        let content = extractJsonString(contentStart);
-                        if (Text.size(content) > 0) {
-                            return unescapeJson(content);
-                        };
-                    };
-                };
+        // Simple approach: look for content pattern and extract until next quote
+        let contentPattern = "\"content\":\"";
+        
+        if (Text.contains(response, #text contentPattern)) {
+            // Split the response by the content pattern
+            let parts = Text.split(response, #text contentPattern);
+            let partsArray = Iter.toArray(parts);
+            
+            if (partsArray.size() >= 2) {
+                // Get the part after "content":"
+                let afterContent = partsArray[1];
+                
+                // Find the first unescaped quote to end the content
+                let content = extractContentUntilQuote(afterContent);
+                return unescapeJson(content);
             };
         };
         
-        // Fallback: if JSON parsing fails, return error
-        return "Error: Could not parse API response. The service may be temporarily unavailable.";
+        return "Error: Could not find content field in response";
     };
 
-    // Helper to extract content from JSON string
-    private func extractJsonString(text: Text) : Text {
+    // Helper to extract content until the first unescaped quote
+    private func extractContentUntilQuote(text: Text) : Text {
         var result = "";
-        var escaped = false;
-        var inString = true;
+        var i = 0;
+        let textSize = Text.size(text);
+        let chars = Text.toIter(text);
         
-        for (char in text.chars()) {
-            if (inString) {
-                if (escaped) {
-                    result := result # Text.fromChar(char);
-                    escaped := false;
-                } else if (char == '\\') {
-                    escaped := true;
-                } else if (char == '"') {
-                    inString := false;
-                } else {
-                    result := result # Text.fromChar(char);
-                };
+        for (char in chars) {
+            // Simple approach: just look for the first quote that's not at the very beginning
+            if (i > 0 and Text.fromChar(char) == "\"") {
+                return result;
+            } else {
+                result := result # Text.fromChar(char);
             };
+            i += 1;
         };
         
-        result
+        result;
     };
 
     // Helper to unescape JSON strings
@@ -176,21 +197,21 @@ actor Generator {
         result := Text.replace(result, #text "\\t", "\t");
         result := Text.replace(result, #text "\\\"", "\"");
         result := Text.replace(result, #text "\\\\", "\\");
-        result
+        result;
     };
 
     // Helper function to get current timestamp for debugging
-    private func debug_timestamp() : Text {
-        "Generated at: " # Int.toText(Time.now())
+    private func debugTimestamp() : Text {
+        "Generated at: " # Int.toText(Time.now());
     };
 
     // Test function
     public query func test() : async Text {
-        "Hyv Generator v2.0 - Ready for synthetic data generation!"
+        "Hyv Generator v2.0 - Ready for synthetic data generation!";
     };
 
     // Health check
     public query func health() : async Text {
-        "Generator canister is healthy and ready to generate synthetic data"
+        "Generator canister is healthy and ready to generate synthetic data";
     };
 }
