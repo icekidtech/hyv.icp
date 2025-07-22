@@ -171,7 +171,13 @@ function App() {
 
   const handleGenerate = async (e) => {
     e.preventDefault();
-    if (!backendActor || !prompt || !apiKey) {
+    
+    // Debug logging
+    console.log("Debug - backendActor:", !!backendActor);
+    console.log("Debug - prompt:", prompt, "Length:", prompt.length);
+    console.log("Debug - apiKey:", apiKey ? "PROVIDED" : "MISSING", "Length:", apiKey.length);
+    
+    if (!backendActor || !prompt.trim() || !apiKey.trim()) {
       alert("Please enter both a prompt and your OpenRouter API key.");
       return;
     }
