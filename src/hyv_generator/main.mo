@@ -4,7 +4,7 @@ import Nat "mo:base/Nat";
 import Nat64 "mo:base/Nat64";
 import Debug "mo:base/Debug";
 import Option "mo:base/Option";
-
+import Result "mo:base/Result";
 
 actor Generator {
     // HTTP request and response types for IC HTTP outcalls
@@ -33,105 +33,164 @@ actor Generator {
 
     let ic : IC = actor("aaaaa-aa");
 
-    // Store API key as a stable variable (in production, use proper secret management)
-    private stable var apiKey: ?Text = null;
-
-    // Function to set API key (should be called during deployment)
-    public func setApiKey(key: Text) : async () {
-        apiKey := ?key;
-    };
-
-    // Function to get API key
-    private func getApiKey() : ?Text {
-        // In production, you might want to get this from environment variables
-        // or a secure configuration system
-        switch (apiKey) {
-            case (?key) { ?key };
-            case null { 
-                // Fallback - you can set a default key here during development
-                // or return null to handle missing key gracefully
-                null
-            };
-        }
-    };
-
-    // This function calls the OpenAI API to generate text from a prompt.
-    public func generateText(prompt: Text) : async Text {
-        // Get API key from storage
-        let openAiApiKey = switch (getApiKey()) {
-            case (?key) { key };
-            case null { 
-                return "Error: API key not configured";
-            };
+    // Function to generate synthetic data using OpenRouter API
+    public func generateSyntheticData(prompt: Text, apiKey: Text) : async Text {
+        Debug.print("Generating synthetic data for prompt: " # prompt);
+        
+        if (Text.size(apiKey) == 0) {
+            return "Error: API key is required";
         };
         
-        // Create JSON body for the request
-        let jsonBody = "{\"model\": \"openai/gpt-3.5-turbo\", \"messages\": [{\"role\": \"user\", \"content\": \"" # escapeJson(prompt) # "\"}], \"max_tokens\": 150}";
+        // Enhanced prompt for better synthetic data generation
+        let enhancedPrompt = "Generate realistic synthetic training data based on this request: " # prompt # 
+                           ". Provide structured, diverse examples that would be useful for AI model training. " #
+                           "Focus on creating high-quality, varied data points with realistic patterns.";
+        
+        // Create JSON body for OpenRouter API
+        let jsonBody = "{\"model\": \"openai/gpt-3.5-turbo\", \"messages\": [{\"role\": \"system\", \"content\": \"You are a synthetic data generator. Create high-quality training data that is diverse, realistic, and useful for machine learning. Always provide structured output.\"}, {\"role\": \"user\", \"content\": \"" # escapeJson(enhancedPrompt) # "\"}], \"max_tokens\": 1000, \"temperature\": 0.8}";
         
         let request : HttpRequest = {
             url = "https://openrouter.ai/api/v1/chat/completions";
-            max_response_bytes = ?2000;
+            max_response_bytes = ?5000;
             method = #post;
             headers = [
-                ("Authorization", "Bearer " # openAiApiKey),
+                ("Authorization", "Bearer " # apiKey),
                 ("Content-Type", "application/json"),
-                ("HTTP-Referer", "https://your-domain.com"), // Required by OpenRouter
-                ("X-Title", "Hyv Marketplace") // Optional but recommended
+                ("HTTP-Referer", "http://u6s2n-gx777-77774-qaaba-cai.localhost:4943/"),// Fix with playground link domain
+                ("X-Title", "Hyv AI Data Marketplace") // Optional but recommended
             ];
             body = ?Text.encodeUtf8(jsonBody);
             transform = null;
         };
 
         try {
-            // Perform the HTTPS outcall
+            Debug.print("Making API request to OpenRouter...");
             let response = await ic.http_request(request);
+            
+            Debug.print("Response status: " # Nat.toText(response.status));
             
             switch(Text.decodeUtf8(response.body)) {
                 case (?decoded) {
+                    Debug.print("Response received: " # Text.take(decoded, 200) # "...");
+                    
                     if (response.status == 200) {
-                        // Parse the JSON response to extract the generated text
-                        return parseOpenAIResponse(decoded);
+                        let extractedContent = parseOpenRouterResponse(decoded);
+                        if (Text.startsWith(extractedContent, #text "Error:")) {
+                            return extractedContent;
+                        } else {
+                            return "=== SYNTHETIC TRAINING DATA ===\n\n" # 
+                                   "Generated from prompt: " # prompt # "\n" #
+                                   "Timestamp: " # debug_timestamp() # "\n" #
+                                   "Data quality: High-fidelity synthetic\n\n" #
+                                   "--- DATA START ---\n" #
+                                   extractedContent # "\n" #
+                                   "--- DATA END ---\n\n" #
+                                   "Note: This synthetic data is AI-generated and suitable for training purposes.";
+                        };
                     } else {
                         Debug.print("HTTP Error: " # Nat.toText(response.status));
-                        Debug.print("Response: " # decoded);
-                        return "Error: HTTP " # Nat.toText(response.status) # " - " # decoded;
+                        return "Error: API request failed with status " # Nat.toText(response.status) # 
+                               ". Please check your API key and try again.";
                     }
                 };
                 case null {
-                    return "Error: Could not decode response";
+                    return "Error: Could not decode API response";
                 };
             };
-        } catch (_) {
-            Debug.print("Request failed");
-            return "Error: Request failed";
+        } catch (error) {
+            Debug.print("Request failed with error");
+            return "Error: Network request failed. Please check your connection and try again.";
         };
     };
 
-    // Helper function to escape JSON special characters in the prompt
+    // Legacy function for backward compatibility
+    public func generateText(prompt: Text) : async Text {
+        return "Error: Please use generateSyntheticData with an API key";
+    };
+
+    // Helper function to escape JSON special characters
     private func escapeJson(text: Text) : Text {
-        // Basic JSON escaping - replace quotes and backslashes
         var result = text;
-        result := Text.replace(result, #text "\"", "\\\"");
+        // Replace backslashes first to avoid double escaping
         result := Text.replace(result, #text "\\", "\\\\");
+        result := Text.replace(result, #text "\"", "\\\"");
         result := Text.replace(result, #text "\n", "\\n");
         result := Text.replace(result, #text "\r", "\\r");
+        result := Text.replace(result, #text "\t", "\\t");
         result
     };
 
-    // Helper function to parse OpenAI API response and extract the generated text
-    private func parseOpenAIResponse(response: Text) : Text {
-        // For MVP, return the full response
-        // In production, implement proper JSON parsing
-        response
+    // Enhanced JSON response parser for OpenRouter
+    private func parseOpenRouterResponse(response: Text) : Text {
+        Debug.print("Parsing response...");
+        
+        // Look for the content field in the JSON response
+        switch (Text.split(response, #text "\"content\":")) {
+            case (#next(_, rest)) {
+                // Find the start of the content string
+                switch (Text.split(rest, #text "\"")) {
+                    case (#next(_, contentStart)) {
+                        // Find the end of the content (before the next quote that's not escaped)
+                        let content = extractJsonString(contentStart);
+                        if (Text.size(content) > 0) {
+                            return unescapeJson(content);
+                        };
+                    };
+                };
+            };
+        };
+        
+        // Fallback: if JSON parsing fails, return error
+        return "Error: Could not parse API response. The service may be temporarily unavailable.";
     };
 
-    // Test function to verify the canister is working
+    // Helper to extract content from JSON string
+    private func extractJsonString(text: Text) : Text {
+        var result = "";
+        var escaped = false;
+        var inString = true;
+        
+        for (char in text.chars()) {
+            if (inString) {
+                if (escaped) {
+                    result := result # Text.fromChar(char);
+                    escaped := false;
+                } else if (char == '\\') {
+                    escaped := true;
+                } else if (char == '"') {
+                    inString := false;
+                } else {
+                    result := result # Text.fromChar(char);
+                };
+            };
+        };
+        
+        result
+    };
+
+    // Helper to unescape JSON strings
+    private func unescapeJson(text: Text) : Text {
+        var result = text;
+        result := Text.replace(result, #text "\\n", "\n");
+        result := Text.replace(result, #text "\\r", "\r");
+        result := Text.replace(result, #text "\\t", "\t");
+        result := Text.replace(result, #text "\\\"", "\"");
+        result := Text.replace(result, #text "\\\\", "\\");
+        result
+    };
+
+    // Helper function to get current timestamp for debugging
+    private func debug_timestamp() : Text {
+        "Generated at: " # Int.toText(Time.now())
+    };
+
+    // Test function
     public query func test() : async Text {
-        "Generator canister is working!"
+        "Hyv Generator v2.0 - Ready for synthetic data generation!"
     };
 
-    // Function to check if API key is configured
-    public query func hasApiKey() : async Bool {
-        Option.isSome(apiKey)
+    // Health check
+    public query func health() : async Text {
+        "Generator canister is healthy and ready to generate synthetic data"
     };
 }
