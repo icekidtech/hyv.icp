@@ -83,12 +83,9 @@ function App() {
       setIdentity(userIdentity);
       setIsAuthenticated(true);
 
-      // Determine the correct host based on environment
-      const isLocal = window.location.hostname === 'localhost' || 
-                      window.location.hostname === '127.0.0.1' ||
-                      window.location.hostname.endsWith('.localhost');
-      const host = isLocal ? "http://127.0.0.1:4943/" : "https://ic0.app";
-
+      // Force local development mode for now
+      const host = "http://127.0.0.1:4943/";
+      
       console.log("Creating agent with host:", host);
       
       const agent = new HttpAgent({ 
@@ -96,12 +93,11 @@ function App() {
         host: host
       });
       
-      // Fetch root key only in local development
-      if (isLocal) {
-        console.log("Fetching root key for local development");
-        await agent.fetchRootKey();
-      }
+      // Always fetch root key in local development
+      console.log("Fetching root key for local development");
+      await agent.fetchRootKey();
       
+      // Create backend actor with the local agent
       const actor = Actor.createActor(backendIdl, { 
         agent, 
         canisterId: backendCanisterId 
