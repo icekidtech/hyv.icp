@@ -22,6 +22,7 @@ function App() {
   const [identity, setIdentity] = useState(null);
   const [backendActor, setBackendActor] = useState(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   const [datasets, setDatasets] = useState([]);
   const [prompt, setPrompt] = useState("");
@@ -32,18 +33,9 @@ function App() {
   const [searchParams, setSearchParams] = useState({});
   const [generatedData, setGeneratedData] = useState(null);
 
-  // Authentication setup
+  // Initialize authentication on app load
   useEffect(() => {
-    AuthClient.create().then(async (client) => {
-      setAuthClient(client);
-      const authenticated = await client.isAuthenticated();
-      if (authenticated) {
-        setIsAuthenticated(true);
-        setShowLanding(false);
-        setShowLogin(false);
-        handleAuthenticated(client);
-      }
-    });
+    initializeAuth();
   }, []);
 
   // Animate main app when it loads
@@ -53,56 +45,106 @@ function App() {
     }
   }, [isAuthenticated]);
 
-  const handleAuthenticated = (client) => {
-    const user_identity = client.getIdentity();
-    setIdentity(user_identity);
-    setIsAuthenticated(true);
-
-    const agent = new HttpAgent({ 
-      identity: user_identity, 
-      host: process.env.DFX_NETWORK === "ic" ? "https://ic0.app" : "http://127.0.0.1:4943/" 
-    });
-    
-    if (process.env.DFX_NETWORK !== "ic") {
-      agent.fetchRootKey();
+  const initializeAuth = async () => {
+    try {
+      console.log("Initializing authentication...");
+      const client = await AuthClient.create({
+        idleOptions: {
+          idleTimeout: 1000 * 60 * 30, // 30 minutes
+          disableDefaultIdleCallback: true,
+        },
+      });
+      
+      setAuthClient(client);
+      
+      // Check if user is already authenticated
+      const authenticated = await client.isAuthenticated();
+      console.log("Authentication status:", authenticated);
+      
+      if (authenticated) {
+        const userIdentity = client.getIdentity();
+        console.log("User already authenticated with principal:", userIdentity.getPrincipal().toString());
+        await handleAuthenticationSuccess(userIdentity);
+        setShowLanding(false);
+        setShowLogin(false);
+      }
+    } catch (error) {
+      console.error("Failed to initialize authentication:", error);
+    } finally {
+      setIsInitializing(false);
     }
-    
-    const actor = Actor.createActor(backendIdl, { agent, canisterId: backendCanisterId });
-    setBackendActor(actor);
+  };
+
+  const handleAuthenticationSuccess = async (userIdentity) => {
+    try {
+      setIdentity(userIdentity);
+      setIsAuthenticated(true);
+
+      // Determine the correct host based on environment
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const host = isLocal ? "http://127.0.0.1:4943/" : "https://ic0.app";
+
+      console.log("Creating agent with host:", host);
+      
+      const agent = new HttpAgent({ 
+        identity: userIdentity, 
+        host: host
+      });
+      
+      // Fetch root key only in local development
+      if (isLocal) {
+        console.log("Fetching root key for local development");
+        await agent.fetchRootKey();
+      }
+      
+      const actor = Actor.createActor(backendIdl, { 
+        agent, 
+        canisterId: backendCanisterId 
+      });
+      
+      setBackendActor(actor);
+      console.log("Backend actor created successfully");
+    } catch (error) {
+      console.error("Failed to setup backend connection:", error);
+    }
   };
 
   const handleEnterApp = () => {
+    console.log("Entering app - showing login screen");
     setShowLanding(false);
     setShowLogin(true);
   };
 
-  const handleLogin = async (identity) => {
-    const agent = new HttpAgent({ 
-      identity, 
-      host: process.env.DFX_NETWORK === "ic" ? "https://ic0.app" : "http://127.0.0.1:4943/" 
-    });
-    
-    if (process.env.DFX_NETWORK !== "ic") {
-      agent.fetchRootKey();
-    }
-    
-    const actor = Actor.createActor(backendIdl, { agent, canisterId: backendCanisterId });
-    setBackendActor(actor);
-    setIdentity(identity);
-    setIsAuthenticated(true);
+  const handleLogin = async (userIdentity) => {
+    console.log("Login successful, setting up user session");
+    await handleAuthenticationSuccess(userIdentity);
     setShowLogin(false);
   };
 
   const handleLogout = async () => {
-    if (authClient) {
-      await authClient.logout();
+    try {
+      console.log("Logging out user");
+      if (authClient) {
+        await authClient.logout();
+      }
+      
+      // Reset all state
+      setIsAuthenticated(false);
+      setIdentity(null);
+      setBackendActor(null);
+      setShowLanding(true);
+      setShowLogin(false);
+      setIsVisible(false);
+      setDatasets([]);
+      setModels([]);
+      setGeneratedData(null);
+      setPrompt("");
+      setApiKey("");
+      
+      console.log("Logout complete - redirecting to landing page");
+    } catch (error) {
+      console.error("Error during logout:", error);
     }
-    setIsAuthenticated(false);
-    setIdentity(null);
-    setBackendActor(null);
-    setShowLanding(true);
-    setShowLogin(false);
-    setIsVisible(false);
   };
 
   // Data fetching functions
@@ -110,8 +152,10 @@ function App() {
     if (!backendActor) return;
     setLoading(true);
     try {
+      console.log("Fetching datasets...");
       const result = await backendActor.listDatasets();
       setDatasets(result);
+      console.log("Datasets fetched:", result.length);
     } catch (error) {
       console.error("Failed to fetch datasets:", error);
     }
@@ -119,7 +163,9 @@ function App() {
   };
 
   useEffect(() => {
-    if (backendActor) fetchDatasets();
+    if (backendActor) {
+      fetchDatasets();
+    }
   }, [backendActor]);
 
   const handleGenerate = async (e) => {
@@ -130,6 +176,7 @@ function App() {
     }
     setLoading(true);
     try {
+      console.log("Generating dataset with prompt:", prompt);
       const newDatasetId = await backendActor.generateAndStoreDataset(prompt, apiKey);
       alert(`Successfully generated and stored dataset with ID: ${newDatasetId}`);
       setPrompt("");
@@ -144,19 +191,39 @@ function App() {
 
   // Model-related logic
   useEffect(() => {
-    if (isAuthenticated) {
-      hyv_backend.listModels().then(setModels);
+    if (isAuthenticated && backendActor) {
+      hyv_backend.listModels().then(setModels).catch(console.error);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, backendActor]);
 
   async function handleSearch(params) {
-    const results = await hyv_backend.searchModels(params.domain, params.modelType, params.performance);
-    setModels(results);
+    try {
+      const results = await hyv_backend.searchModels(params.domain, params.modelType, params.performance);
+      setModels(results);
+    } catch (error) {
+      console.error("Search failed:", error);
+    }
   }
 
   async function handleUpload(id) {
-    const model = await hyv_backend.getModelNFT(id);
-    setModels((prev) => [...prev, model]);
+    try {
+      const model = await hyv_backend.getModelNFT(id);
+      if (model) {
+        setModels((prev) => [...prev, model]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch uploaded model:", error);
+    }
+  }
+
+  // Show loading spinner during initialization
+  if (isInitializing) {
+    return (
+      <div className="app-loading">
+        <div className="loading-spinner"></div>
+        <p>Initializing Hyv Marketplace...</p>
+      </div>
+    );
   }
 
   // Flow: Landing Page → Internet Identity Login → Main App Dashboard
@@ -200,7 +267,9 @@ function App() {
             </div>
             <div className="user-details">
               <span className="user-greeting">Welcome back!</span>
-              <span className="user-status">Connected via Internet Identity</span>
+              <span className="user-status">
+                {identity ? `Principal: ${identity.getPrincipal().toString().slice(0, 8)}...` : 'Connected via Internet Identity'}
+              </span>
             </div>
             <button onClick={handleLogout} className="btn btn-secondary logout-btn">
               <span>Logout</span>
