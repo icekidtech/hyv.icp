@@ -354,6 +354,23 @@ body {
   resize: vertical;
 }
 
+/* Form Help Text */
+.form-help {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 0.5rem;
+  line-height: 1.4;
+}
+
+.form-help a {
+  color: #42EE68;
+  text-decoration: none;
+}
+
+.form-help a:hover {
+  text-decoration: underline;
+}
+
 /* Buttons */
 .btn {
   position: relative;
@@ -455,11 +472,22 @@ body {
   border-radius: 12px;
   padding: 1.5rem;
   transition: all 0.3s;
+  cursor: pointer;
 }
 
 .dataset-card:hover {
   transform: translateX(5px);
   border-color: rgba(66, 238, 104, 0.3);
+  background: rgba(66, 238, 104, 0.05);
+}
+
+.dataset-card.error {
+  border-color: rgba(255, 87, 87, 0.3);
+  background: rgba(255, 87, 87, 0.05);
+}
+
+.dataset-card.error:hover {
+  border-color: rgba(255, 87, 87, 0.5);
 }
 
 .dataset-header {
@@ -603,6 +631,69 @@ body {
   color: #42EE68;
   overflow-x: auto;
   white-space: pre-wrap;
+}
+
+/* Enhanced Modal */
+.enhanced-modal {
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.dataset-info {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tags-container {
+  margin: 1rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.modal-tag {
+  background: rgba(66, 238, 104, 0.2);
+  color: #42EE68;
+  padding: 0.25rem 0.75rem;
+  border-radius: 15px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.content-preview {
+  margin-bottom: 2rem;
+}
+
+.content-preview h4 {
+  margin-bottom: 1rem;
+  color: #42EE68;
+}
+
+.synthetic-data {
+  max-height: 300px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(66, 238, 104, 0.3);
+  border-radius: 8px;
+  padding: 1.5rem;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.9rem;
+  color: #e8e8e8;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* App Loading Screen */
