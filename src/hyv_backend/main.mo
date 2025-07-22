@@ -38,24 +38,20 @@ actor Main {
     mintedAt: Int;
   };
 
-  // The unique identifier for a dataset
-  type DatasetId = Nat;
-
-  // The main data structure for a dataset
-  type Dataset = {
-    id: DatasetId;
+  public type Dataset = {
+    id: Nat;
     title: Text;
     description: Text;
     tags: [Text];
     uploader: Principal;
-    fileHash: Text; // Keep the hash for verification
+    fileHash: Text;
     uploadDate: Int;
-    content: Text; // ✅ New field to store generated text
+    content: Text;
   };
 
-  // Stable variables to persist data across upgrades
-  private stable var nextId: DatasetId = 0;
-  private stable var datasetsEntries: [(DatasetId, Dataset)] = [];
+  public type DatasetId = Nat;
+
+  private stable var nextId: Nat = 0;
   private var datasets = Map.HashMap<DatasetId, Dataset>(0, Nat.equal, func(n: Nat) : Nat32 { Nat32.fromNat(n % (2**32)) });
 
   // Define stable state for models
@@ -64,36 +60,43 @@ actor Main {
 
   // Define the public interface (actor type) for the generator canister.
   type Generator = actor {
+    generateSyntheticData: (prompt: Text, apiKey: Text) -> async Text;
     generateText: (prompt: Text) -> async Text;
   };
 
   // A private helper function to hash text using a simple hash.
   private func hashText(text: Text) : Text {
-    // For MVP, we'll use a simple text-based hash
-    // In production, you'd want to use proper SHA256
     let hash = Text.hash(text);
     return Nat32.toText(hash);
   };
 
-  // A new public function to orchestrate the AI generation and storage.
-  public func generateAndStoreDataset(prompt: Text) : async DatasetId {
-    // Call the generator canister without exposing API key
+  // Updated function to generate and store synthetic data with API key
+  public func generateAndStoreDataset(prompt: Text, apiKey: Text) : async DatasetId {
     let generator = await getGeneratorActor();
-    let response = await generator.generateText(prompt); // 🔄 This is the raw generated text
+    let response = await generator.generateSyntheticData(prompt, apiKey);
     
-    let title = "Generated Dataset " # Nat.toText(nextId);
-    let description = "Synthetic data generated from prompt: " # prompt;
-    let tags = ["synthetic", "generated"];
-    let fileHash = hashText(response); // Keep the hash for verification
-    
-    return await uploadDataset(title, description, tags, fileHash, response); // ✅ Pass raw text
+    // Check if generation was successful
+    if (Text.startsWith(response, #text "Error:")) {
+      // For error cases, still store but mark as failed
+      let title = "Failed Generation - " # Nat.toText(nextId);
+      let description = "Generation failed for prompt: " # prompt;
+      let tags = ["synthetic", "error", "failed"];
+      let fileHash = hashText(response);
+      
+      return await uploadDataset(title, description, tags, fileHash, response);
+    } else {
+      let title = "Synthetic Dataset #" # Nat.toText(nextId);
+      let description = "High-quality synthetic training data generated from: " # Text.take(prompt, 100) # "...";
+      let tags = ["synthetic", "ai-generated", "training-data", "verified"];
+      let fileHash = hashText(response);
+      
+      return await uploadDataset(title, description, tags, fileHash, response);
+    };
   };
 
   // Helper function to get the generator actor
   private func getGeneratorActor() : async Generator {
-    // Get the generator canister ID from the dfx environment
-    // This will be set during deployment
-    let generatorCanisterId = "uzt4z-lp777-77774-qaabq-cai"; // Updated with correct generator ID
+    let generatorCanisterId = "uzt4z-lp777-77774-qaabq-cai";
     return actor(generatorCanisterId) : Generator;
   };
 
@@ -103,7 +106,7 @@ actor Main {
     description: Text, 
     tags: [Text], 
     fileHash: Text, 
-    content: Text // ✅ New parameter
+    content: Text
   ) : async DatasetId {
     let caller = Principal.fromActor(Main);
     let timestamp = Time.now();
@@ -116,7 +119,7 @@ actor Main {
       uploader = caller;
       fileHash = fileHash;
       uploadDate = timestamp;
-      content = content; // ✅ Store raw text
+      content = content;
     };
 
     datasets.put(nextId, new_dataset);
@@ -132,8 +135,13 @@ actor Main {
     return Iter.toArray(dataset_iterator);
   };
 
+  // Get dataset by ID
+  public query func getDataset(id: DatasetId) : async ?Dataset {
+    datasets.get(id)
+  };
+
   public query func greet(name : Text) : async Text {
-    return "Hello, " # name # "!";
+    return "Hello, " # name # "! Welcome to Hyv Synthetic Data Marketplace.";
   };
 
   // --- Model Marketplace Functions ---
@@ -164,7 +172,7 @@ actor Main {
   };
 
   public query func getModelNFT(id: Nat) : async ?ModelNFT {
-    Array.find<ModelNFT>(models, func(m) = m.id == id)
+    Array.find(models, func(m: ModelNFT) : Bool = m.id == id)
   };
 
   public query func searchModels(
@@ -172,40 +180,10 @@ actor Main {
     modelType: ?ModelType,
     performance: ?Text
   ) : async [ModelNFT] {
-    Array.filter<ModelNFT>(models, func(m) {
-      let domainMatch = switch (domain) {
-        case null { true };
-        case (?d) { m.metadata.domain == d };
-      };
-      
-      let typeMatch = switch (modelType) {
-        case null { true };
-        case (?t) { m.metadata.modelType == t };
-      };
-      
-      let performanceMatch = switch (performance) {
-        case null { true };
-        case (?p) { Text.contains(m.metadata.performance, #text p) };
-      };
-      
-      domainMatch and typeMatch and performanceMatch
-    })
-  };
-
-  // In hyv_backend/main.mo
-  public query func getDataset(id: DatasetId) : async ?Dataset {
-    return datasets.get(id);
-  };
-
-  // System functions for upgrade persistence - MUST be at the end
-  system func preupgrade() {
-    // Convert HashMap to stable array for persistence
-    datasetsEntries := Iter.toArray(datasets.entries());
-  };
-
-  system func postupgrade() {
-    // Restore HashMap from stable array
-    datasets := Map.fromIter<DatasetId, Dataset>(datasetsEntries.vals(), datasetsEntries.size(), Nat.equal, func(n: Nat) : Nat32 { Nat32.fromNat(n % (2**32)) });
-    datasetsEntries := [];
+    Array.filter(models, func(m: ModelNFT) : Bool =
+      (switch(domain) { case null true; case (?d) m.metadata.domain == d }) and
+      (switch(modelType) { case null true; case (?t) m.metadata.modelType == t }) and
+      (switch(performance) { case null true; case (?p) Text.contains(m.metadata.performance, p) })
+    )
   };
 }
