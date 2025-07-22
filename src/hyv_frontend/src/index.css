@@ -605,6 +605,34 @@ body {
   white-space: pre-wrap;
 }
 
+/* App Loading Screen */
+.app-loading {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #09391A 0%, #0a4520 30%, #10692F 70%, #0d5025 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  font-family: 'Space Mono', monospace;
+  color: white;
+}
+
+.app-loading .loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(66, 238, 104, 0.3);
+  border-top: 3px solid #42EE68;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.app-loading p {
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.8);
+  text-align: center;
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
   .content-grid {
