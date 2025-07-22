@@ -33,6 +33,9 @@ function App() {
   const [searchParams, setSearchParams] = useState({});
   const [generatedData, setGeneratedData] = useState(null);
 
+  const [showDataModal, setShowDataModal] = useState(false);
+  const [currentDataset, setCurrentDataset] = useState(null);
+
   // Initialize authentication on app load
   useEffect(() => {
     initializeAuth();
@@ -171,20 +174,28 @@ function App() {
   const handleGenerate = async (e) => {
     e.preventDefault();
     if (!backendActor || !prompt || !apiKey) {
-      alert("Please enter a prompt and your OpenAI API key.");
+      alert("Please enter both a prompt and your OpenRouter API key.");
       return;
     }
     setLoading(true);
     try {
-      console.log("Generating dataset with prompt:", prompt);
+      console.log("Generating synthetic data with prompt:", prompt);
       const newDatasetId = await backendActor.generateAndStoreDataset(prompt, apiKey);
-      alert(`Successfully generated and stored dataset with ID: ${newDatasetId}`);
+      
+      // Fetch the generated dataset to show it to the user
+      const generatedDataset = await backendActor.getDataset(newDatasetId);
+      if (generatedDataset.length > 0) {
+        setCurrentDataset(generatedDataset[0]);
+        setShowDataModal(true);
+      }
+      
+      alert(`✅ Successfully generated synthetic dataset with ID: ${newDatasetId}`);
       setPrompt("");
       setApiKey("");
       fetchDatasets();
     } catch (error) {
       console.error("Generation failed:", error);
-      alert("Generation failed. See console for details.");
+      alert("❌ Generation failed. Please check your API key and try again. See console for details.");
     }
     setLoading(false);
   };
@@ -292,26 +303,32 @@ function App() {
               </div>
               <div className="card-content">
                 <div className="form-group">
-                  <label htmlFor="prompt">Data Generation Prompt</label>
+                  <label htmlFor="prompt">Synthetic Data Generation Prompt</label>
                   <textarea
                     id="prompt"
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Describe the type of data you want to generate..."
+                    placeholder="Example: Generate 10 customer reviews for a coffee shop with ratings and sentiment..."
                     className="textarea modern-input"
                     rows={4}
                   />
+                  <small className="form-help">
+                    🤖 Describe the type of training data you need. Be specific about format, quantity, and use case.
+                  </small>
                 </div>
                 <div className="form-group">
-                  <label htmlFor="apiKey">OpenAI API Key</label>
+                  <label htmlFor="apiKey">OpenRouter API Key</label>
                   <input
                     id="apiKey"
                     type="password"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="Enter your OpenAI API key"
+                    placeholder="Enter your OpenRouter API key"
                     className="input modern-input"
                   />
+                  <small className="form-help">
+                    🔑 Get your API key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">OpenRouter.ai</a>
+                  </small>
                 </div>
                 <button
                   onClick={handleGenerate}
@@ -321,11 +338,11 @@ function App() {
                   {loading ? (
                     <>
                       <div className="loading-spinner"></div>
-                      <span>Generating...</span>
+                      <span>Generating Synthetic Data...</span>
                     </>
                   ) : (
                     <>
-                      <span>Generate Dataset</span>
+                      <span>🚀 Generate Training Data</span>
                       <div className="btn-glow"></div>
                     </>
                   )}
@@ -425,20 +442,46 @@ function App() {
       </main>
 
       {/* Generated Data Modal */}
-      {generatedData && (
-        <div className="modal-overlay">
-          <div className="modal-content">
+      {showDataModal && currentDataset && (
+        <div className="modal-overlay" onClick={() => setShowDataModal(false)}>
+          <div className="modal-content enhanced-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Generated Data</h2>
-              <button onClick={() => setGeneratedData(null)} className="modal-close">×</button>
+              <h2>🎉 Synthetic Data Generated Successfully!</h2>
+              <button onClick={() => setShowDataModal(false)} className="modal-close">×</button>
             </div>
             <div className="modal-body">
-              <p><strong>Title:</strong> {generatedData.title}</p>
-              <p><strong>Description:</strong> {generatedData.description}</p>
-              <p><strong>Tags:</strong> {generatedData.tags.join(', ')}</p>
-              <p><strong>Content:</strong></p>
-              <pre className="code-preview">{generatedData.content}</pre>
-              <p><strong>Hash:</strong> {generatedData.fileHash}</p>
+              <div className="dataset-info">
+                <h3><strong>📊 Dataset:</strong> {currentDataset.title}</h3>
+                <p><strong>📝 Description:</strong> {currentDataset.description}</p>
+                <div className="tags-container">
+                  <strong>🏷️ Tags:</strong>
+                  {currentDataset.tags.map((tag, index) => (
+                    <span key={index} className="tag modal-tag">{tag}</span>
+                  ))}
+                </div>
+                <p><strong>🔐 Hash:</strong> <code>{currentDataset.fileHash}</code></p>
+              </div>
+              <div className="content-preview">
+                <h4><strong>📄 Generated Content:</strong></h4>
+                <pre className="code-preview synthetic-data">{currentDataset.content}</pre>
+              </div>
+              <div className="modal-actions">
+                <button 
+                  className="btn btn-primary" 
+                  onClick={() => {
+                    navigator.clipboard.writeText(currentDataset.content);
+                    alert('📋 Content copied to clipboard!');
+                  }}
+                >
+                  📋 Copy to Clipboard
+                </button>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={() => setShowDataModal(false)}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
