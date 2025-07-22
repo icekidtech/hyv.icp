@@ -36,6 +36,8 @@ function App() {
   const [showDataModal, setShowDataModal] = useState(false);
   const [currentDataset, setCurrentDataset] = useState(null);
 
+  const [connectionStatus, setConnectionStatus] = useState("disconnected");
+
   // Initialize authentication on app load
   useEffect(() => {
     initializeAuth();
@@ -80,11 +82,12 @@ function App() {
 
   const handleAuthenticationSuccess = async (userIdentity) => {
     try {
+      setConnectionStatus("connecting");
       setIdentity(userIdentity);
       setIsAuthenticated(true);
 
-      // Force local development mode for now
-      const host = "http://127.0.0.1:4943/";
+      // Use the correct local development host
+      const host = process.env.DFX_NETWORK === "local" ? "http://127.0.0.1:4943" : "https://ic0.app";
       
       console.log("Creating agent with host:", host);
       
@@ -93,19 +96,27 @@ function App() {
         host: host
       });
       
-      // Always fetch root key in local development
-      console.log("Fetching root key for local development");
-      await agent.fetchRootKey();
+      // Only fetch root key in local development
+      if (process.env.DFX_NETWORK !== "ic") {
+        console.log("Fetching root key for local development");
+        await agent.fetchRootKey();
+      }
       
-      // Create backend actor with the local agent
+      // Create backend actor with the agent
       const actor = Actor.createActor(backendIdl, { 
         agent, 
         canisterId: backendCanisterId 
       });
       
+      console.log("Testing backend connection...");
+      // Test the connection
+      await actor.listDatasets();
+      
       setBackendActor(actor);
-      console.log("Backend actor created successfully");
+      setConnectionStatus("connected");
+      console.log("Backend actor created and tested successfully");
     } catch (error) {
+      setConnectionStatus("failed");
       console.error("Failed to setup backend connection:", error);
     }
   };
@@ -174,19 +185,31 @@ function App() {
     
     // Debug logging
     console.log("Debug - backendActor:", !!backendActor);
-    console.log("Debug - prompt:", prompt, "Length:", prompt.length);
-    console.log("Debug - apiKey:", apiKey ? "PROVIDED" : "MISSING", "Length:", apiKey.length);
+    console.log("Debug - prompt:", prompt, "Length:", prompt?.length || 0);
+    console.log("Debug - apiKey:", apiKey ? "PROVIDED" : "MISSING", "Length:", apiKey?.length || 0);
     
-    if (!backendActor || !prompt.trim() || !apiKey.trim()) {
-      alert("Please enter both a prompt and your OpenRouter API key.");
+    // Improved validation
+    if (!backendActor) {
+      alert("Backend connection not established. Please refresh the page and try again.");
       return;
     }
+    
+    if (!prompt || !prompt.trim()) {
+      alert("Please enter a prompt for data generation.");
+      return;
+    }
+    
+    if (!apiKey || !apiKey.trim()) {
+      alert("Please enter your OpenRouter API key.");
+      return;
+    }
+    
     setLoading(true);
     try {
       console.log("Generating synthetic data with prompt:", prompt);
-      const newDatasetId = await backendActor.generateAndStoreDataset(prompt, apiKey);
+      const newDatasetId = await backendActor.generateAndStoreDataset(prompt.trim(), apiKey.trim());
       
-      // Fetch the generated dataset to show it to the user
+      // Fetch the generated dataset
       const generatedDataset = await backendActor.getDataset(newDatasetId);
       if (generatedDataset.length > 0) {
         setCurrentDataset(generatedDataset[0]);
@@ -199,7 +222,7 @@ function App() {
       fetchDatasets();
     } catch (error) {
       console.error("Generation failed:", error);
-      alert("❌ Generation failed. Please check your API key and try again. See console for details.");
+      alert(`❌ Generation failed: ${error.message || "Unknown error"}. Please check your API key and try again.`);
     }
     setLoading(false);
   };
