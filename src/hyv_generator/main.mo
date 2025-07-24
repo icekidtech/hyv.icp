@@ -31,7 +31,7 @@ actor Generator {
 
     // The management canister interface for HTTP outcalls
     type IC = actor {
-        http_request : (HttpRequest) -> async HttpResponse;
+        http_request : (HttpRequestArgs) -> async HttpResponse;
     };
 
     let ic : IC = actor("aaaaa-aa");
