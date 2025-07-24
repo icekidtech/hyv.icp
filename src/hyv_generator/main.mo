@@ -236,4 +236,26 @@ actor Generator {
         };
         transformed;
     };
+    
+    // Test HTTP call function
+    public func testHttpCall() : async Text {
+        try {
+            let request : HttpRequestArgs = {
+                url = "https://httpbin.org/get";
+                max_response_bytes = ?1000;
+                headers = [];
+                body = null;
+                method = #get;
+                transform = ?{
+                    function = transform;
+                    context = Blob.fromArray([]);
+                };
+            };
+            
+            let response = await ic.http_request(request);
+            return "HTTP test successful";
+        } catch (error) {
+            return "HTTP test failed";
+        };
+    };
 }
