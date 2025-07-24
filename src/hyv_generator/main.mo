@@ -258,4 +258,33 @@ actor Generator {
             return "HTTP test failed";
         };
     };
+    
+    // Additional types for HTTP outcalls
+    type HttpRequestArgs = {
+        url : Text;
+        max_response_bytes : ?Nat64;
+        headers : [(Text, Text)];
+        body : ?Blob;
+        method : { #get; #post; #head };
+        transform : ?{
+            function : shared query (TransformArgs) -> async CanisterHttpResponsePayload;
+            context : Blob;
+        };
+    };
+
+    type TransformArgs = {
+        response : HttpResponse;
+        context : Blob;
+    };
+
+    type CanisterHttpResponsePayload = {
+        status : Nat;
+        headers : [HttpHeader];
+        body : Blob;
+    };
+
+    type HttpHeader = {
+        name : Text;
+        value : Text;
+    };
 }
