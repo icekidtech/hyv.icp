@@ -5,8 +5,8 @@
       "type": "motoko"
     },
     "hyv_generator": {
-      "main": "src/hyv_generator/main.mo",
-      "type": "motoko"
+      "type": "motoko",
+      "main": "src/hyv_generator/main.mo"
     },
     "hyv_frontend": {
       "dependencies": [
@@ -27,5 +27,14 @@
     }
   },
   "output_env_file": ".env",
-  "version": 1
+  "version": 1,
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:4943",
+      "type": "ephemeral",
+      "replica": {
+        "subnet_type": "system"
+      }
+    }
+  }
 }
