@@ -52,23 +52,23 @@ actor Generator {
         // Create JSON body for OpenRouter API
         let jsonBody = "{\"model\": \"openai/gpt-3.5-turbo\", \"messages\": [{\"role\": \"system\", \"content\": \"You are a synthetic data generator. Create high-quality training data that is diverse, realistic, and useful for machine learning. Always provide structured output.\"}, {\"role\": \"user\", \"content\": \"" # escapeJson(enhancedPrompt) # "\"}], \"max_tokens\": 1000, \"temperature\": 0.8}";
         
-        let request : HttpRequest = {
+        // Update the HTTP request with better error handling
+        let http_request : HttpRequest = {
             url = "https://openrouter.ai/api/v1/chat/completions";
-            max_response_bytes = ?5000;
-            method = #post;
+            max_response_bytes = ?Nat64.fromNat(2000);
             headers = [
                 ("Authorization", "Bearer " # apiKey),
                 ("Content-Type", "application/json"),
-                ("HTTP-Referer", "http://u6s2n-gx777-77774-qaaba-cai.localhost:4943/"),
-                ("X-Title", "Hyv AI Data Marketplace")
+                ("User-Agent", "Mozilla/5.0"),
             ];
             body = ?Text.encodeUtf8(jsonBody);
+            method = #post;
             transform = null;
         };
 
         try {
             Debug.print("Making API request to OpenRouter...");
-            let response = await ic.http_request(request);
+            let response = await ic.http_request(http_request);
             
             Debug.print("Response status: " # Nat.toText(response.status));
             
@@ -213,5 +213,27 @@ actor Generator {
     // Health check
     public query func health() : async Text {
         "Generator canister is healthy and ready to generate synthetic data";
+    };
+    
+    public query func transform(raw : TransformArgs) : async CanisterHttpResponsePayload {
+        let transformed : CanisterHttpResponsePayload = {
+            status = raw.response.status;
+            body = raw.response.body;
+            headers = [
+                {
+                    name = "Content-Security-Policy";
+                    value = "default-src 'self'";
+                },
+                { name = "Referrer-Policy"; value = "strict-origin" },
+                { name = "Permissions-Policy"; value = "geolocation=(self)" },
+                {
+                    name = "Strict-Transport-Security";
+                    value = "max-age=63072000";
+                },
+                { name = "X-Frame-Options"; value = "DENY" },
+                { name = "X-Content-Type-Options"; value = "nosniff" },
+            ];
+        };
+        transformed;
     };
 }
