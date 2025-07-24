@@ -11,18 +11,6 @@ import Iter "mo:base/Iter";
 
 actor Generator {
     // HTTP request and response types for IC HTTP outcalls
-    type HttpRequest = {
-        url : Text;
-        max_response_bytes: ?Nat64;
-        headers: [(Text, Text)];
-        body: ?Blob;
-        method: { #get; #post; #head };
-        transform: ?{
-            function: shared query (response: HttpResponse) -> async HttpResponse;
-            context: Blob;
-        };
-    };
-
     type HttpResponse = {
         status: Nat;
         headers: [(Text, Text)];
@@ -53,7 +41,7 @@ actor Generator {
         let jsonBody = "{\"model\": \"openai/gpt-3.5-turbo\", \"messages\": [{\"role\": \"system\", \"content\": \"You are a synthetic data generator. Create high-quality training data that is diverse, realistic, and useful for machine learning. Always provide structured output.\"}, {\"role\": \"user\", \"content\": \"" # escapeJson(enhancedPrompt) # "\"}], \"max_tokens\": 1000, \"temperature\": 0.8}";
         
         // Update the HTTP request with better error handling
-        let http_request : HttpRequest = {
+        let http_request : HttpRequestArgs = {
             url = "https://openrouter.ai/api/v1/chat/completions";
             max_response_bytes = ?Nat64.fromNat(2000);
             headers = [
@@ -63,7 +51,10 @@ actor Generator {
             ];
             body = ?Text.encodeUtf8(jsonBody);
             method = #post;
-            transform = null;
+            transform = ?{
+                function = transform;
+                context = Blob.fromArray([]);
+            };
         };
 
         try {
