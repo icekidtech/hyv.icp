@@ -59,44 +59,32 @@ actor Main {
   private stable var models: [ModelNFT] = [];
   private stable var nextModelId: Nat = 0;
 
-  // Define the public interface (actor type) for the generator canister.
-  type Generator = actor {
-    generateSyntheticData: (prompt: Text, apiKey: Text) -> async Text;
-    generateText: (prompt: Text) -> async Text;
-  };
-
   // A private helper function to hash text using a simple hash.
   private func hashText(text: Text) : Text {
     let hash = Text.hash(text);
     return Nat32.toText(hash);
   };
 
-  // Helper function to get the generator actor
-  private func getGeneratorActor() : async Generator.Generator {
-    return Generator;
-  };
-  
   // Updated function to generate and store synthetic data with API key
   public func generateAndStoreDataset(prompt: Text, apiKey: Text) : async DatasetId {
-    let generator = await getGeneratorActor();
-    let response = await generator.generateSyntheticData(prompt, apiKey);
+    let response = await Generator.generateSyntheticData(prompt, apiKey);
     
     // Check if generation was successful
     if (Text.startsWith(response, #text "Error:")) {
-      // For error cases, still store but mark as failed
-      let title = "Failed Generation - " # Nat.toText(nextId);
-      let description = "Generation failed for prompt: " # prompt;
-      let tags = ["synthetic", "error", "failed"];
-      let fileHash = hashText(response);
-      
-      return await uploadDataset(title, description, tags, fileHash, response);
+        // For error cases, still store but mark as failed
+        let title = "Failed Generation - " # Nat.toText(nextId);
+        let description = "Generation failed for prompt: " # prompt;
+        let tags = ["synthetic", "error", "failed"];
+        let fileHash = hashText(response);
+        
+        return await uploadDataset(title, description, tags, fileHash, response);
     } else {
-      let title = "Synthetic Dataset #" # Nat.toText(nextId);
-      let description = "High-quality synthetic training data generated from: " # truncateText(prompt, 100) # "...";
-      let tags = ["synthetic", "ai-generated", "training-data", "verified"];
-      let fileHash = hashText(response);
-      
-      return await uploadDataset(title, description, tags, fileHash, response);
+        let title = "Synthetic Dataset #" # Nat.toText(nextId);
+        let description = "High-quality synthetic training data generated from: " # truncateText(prompt, 100) # "...";
+        let tags = ["synthetic", "ai-generated", "training-data", "verified"];
+        let fileHash = hashText(response);
+        
+        return await uploadDataset(title, description, tags, fileHash, response);
     };
   };
 

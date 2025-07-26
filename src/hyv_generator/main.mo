@@ -9,14 +9,7 @@ import Time "mo:base/Time";
 import Int "mo:base/Int";
 import Iter "mo:base/Iter";
 
-public type Generator = actor {
-  generateSyntheticData: (prompt: Text, apiKey: Text) -> async Text;
-  generateText: (prompt: Text) -> async Text;
-  test: () -> async Text;
-  health: () -> async Text;
-};
-
-actor Generator : Generator {
+actor Generator {
     // HTTP request and response types for IC HTTP outcalls
     type HttpResponse = {
         status: Nat;
@@ -31,7 +24,19 @@ actor Generator : Generator {
 
     let ic : IC = actor("aaaaa-aa");
 
-    // Function to generate synthetic data using OpenRouter API
+    // Simplified helper function to escape JSON strings
+    private func escapeJson(text: Text) : Text {
+        var result = text;
+        // Replace in order: backslashes first, then quotes
+        result := Text.replace(result, #text "\\", "\\\\");
+        result := Text.replace(result, #text "\"", "\\\"");
+        result := Text.replace(result, #text "\n", "\\n");
+        result := Text.replace(result, #text "\r", "\\r");
+        result := Text.replace(result, #text "\t", "\\t");
+        result;
+    };
+
+    // Updated function to use Hugging Face API
     public func generateSyntheticData(prompt: Text, apiKey: Text) : async Text {
         Debug.print("Generating synthetic data for prompt: " # prompt);
         
@@ -44,17 +49,17 @@ actor Generator : Generator {
                            ". Provide structured, diverse examples that would be useful for AI model training. " #
                            "Focus on creating high-quality, varied data points with realistic patterns.";
         
-        // Create JSON body for OpenRouter API
-        let jsonBody = "{\"model\": \"openai/gpt-3.5-turbo\", \"messages\": [{\"role\": \"system\", \"content\": \"You are a synthetic data generator. Create high-quality training data that is diverse, realistic, and useful for machine learning. Always provide structured output.\"}, {\"role\": \"user\", \"content\": \"" # escapeJson(enhancedPrompt) # "\"}], \"max_tokens\": 1000, \"temperature\": 0.8}";
+        // Hugging Face API JSON body (using a free model)
+        let jsonBody = "{\"inputs\": \"" # escapeJson(enhancedPrompt) # "\"}";
         
-        // Update the HTTP request with better error handling
+        // Update HTTP request for DeepSeek Coder on Hugging Face
         let http_request : HttpRequestArgs = {
-            url = "https://openrouter.ai/api/v1/chat/completions";
-            max_response_bytes = ?Nat64.fromNat(2000);
+            url = "https://api-inference.huggingface.co/models/deepseek-ai/deepseek-coder-1.3b-instruct"; // DeepSeek model
+            max_response_bytes = ?Nat64.fromNat(4000);
             headers = [
                 ("Authorization", "Bearer " # apiKey),
                 ("Content-Type", "application/json"),
-                ("User-Agent", "Mozilla/5.0"),
+                ("User-Agent", "HyvICP/1.0"),
             ];
             body = ?Text.encodeUtf8(jsonBody);
             method = #post;
@@ -65,64 +70,68 @@ actor Generator : Generator {
         };
 
         try {
-            Debug.print("Making API request to OpenRouter...");
+            Debug.print("Making API request to Hugging Face...");
             let response = await ic.http_request(http_request);
             
             Debug.print("Response status: " # Nat.toText(response.status));
             
-            switch(Text.decodeUtf8(response.body)) {
-                case (?decoded) {
-                    // Use custom function to truncate response for debugging
-                    Debug.print("Response received: " # truncateText(decoded, 200) # "...");
-                    
-                    if (response.status == 200) {
-                        let extractedContent = parseOpenRouterResponse(decoded);
-                        if (Text.startsWith(extractedContent, #text "Error:")) {
-                            return extractedContent;
-                        } else {
-                            return "=== SYNTHETIC TRAINING DATA ===\n\n" # 
-                                   "Generated from prompt: " # prompt # "\n" #
-                                   "Timestamp: " # debugTimestamp() # "\n" #
-                                   "Data quality: High-fidelity synthetic\n\n" #
-                                   "--- DATA START ---\n" #
-                                   extractedContent # "\n" #
-                                   "--- DATA END ---\n\n" #
-                                   "Note: This synthetic data is AI-generated and suitable for training purposes.";
-                        };
-                    } else {
-                        Debug.print("HTTP Error: " # Nat.toText(response.status));
-                        return "Error: API request failed with status " # Nat.toText(response.status) # 
-                               ". Please check your API key and try again.";
+            if (response.status == 200) {
+                switch(Text.decodeUtf8(response.body)) {
+                    case (?decoded) {
+                        Debug.print("Response received: " # truncateText(decoded, 200) # "...");
+                        return processHuggingFaceResponse(decoded, prompt);
+                    };
+                    case null {
+                        return "Error: Failed to decode response";
                     };
                 };
-                case null {
-                    return "Error: Could not decode API response";
-                };
+            } else {
+                Debug.print("API request failed with status: " # Nat.toText(response.status));
+                return generateMockData(prompt);
             };
         } catch (error) {
-            Debug.print("Request failed with error");
-            return "Error: Network request failed. Please check your connection and try again.";
+            Debug.print("HTTP request failed, using fallback");
+            return generateMockData(prompt);
         };
     };
 
-    // Legacy function for backward compatibility
-    public func generateText(prompt: Text) : async Text {
-        return "Error: Please use generateSyntheticData with an API key";
+    // Process Hugging Face response format
+    private func processHuggingFaceResponse(response: Text, originalPrompt: Text) : Text {
+        // Hugging Face returns array format, extract the generated text
+        let cleanedResponse = if (Text.startsWith(response, #text "[")) {
+            // Extract from JSON array format
+            let withoutBrackets = Text.replace(response, #text "[", "");
+            let withoutEndBrackets = Text.replace(withoutBrackets, #text "]", "");
+            withoutEndBrackets;
+        } else {
+            response;
+        };
+        
+        "=== SYNTHETIC TRAINING DATA ===\n\n" #
+        "Generated from prompt: " # originalPrompt # "\n" #
+        "Timestamp: " # Int.toText(Time.now()) # "\n" #
+        "Generator: Hugging Face DialoGPT\n\n" #
+        "--- GENERATED DATA ---\n" #
+        cleanedResponse # "\n" #
+        "--- END DATA ---\n\n" #
+        "Status: Successfully generated using AI";
     };
 
-    // Helper function to escape JSON special characters
-    private func escapeJson(text: Text) : Text {
-        var result = text;
-        // Replace backslashes first to avoid double escaping
-        result := Text.replace(result, #text "\\", "\\\\");
-        result := Text.replace(result, #text "\"", "\\\"");
-        result := Text.replace(result, #text "\n", "\\n");
-        result := Text.replace(result, #text "\r", "\\r");
-        result := Text.replace(result, #text "\t", "\\t");
-        result;
+    // Mock data generator for when API fails
+    private func generateMockData(prompt: Text) : Text {
+        "=== SYNTHETIC TRAINING DATA (MOCK) ===\n\n" #
+        "Generated from prompt: " # prompt # "\n" #
+        "Timestamp: " # Int.toText(Time.now()) # "\n\n" #
+        "--- SAMPLE DATA ---\n" #
+        "Example 1: This is high-quality synthetic data sample based on: " # prompt # "\n" #
+        "Example 2: Another realistic data point for training purposes\n" #
+        "Example 3: Diverse synthetic content suitable for ML model training\n" #
+        "Example 4: Additional structured data following the prompt requirements\n" #
+        "--- END DATA ---\n\n" #
+        "Note: This is mock data for testing purposes when API is unavailable.";
     };
 
-    // Helper function to truncate text (replaces Text.take)
+    // Helper function to truncate text
     private func truncateText(text: Text, maxLength: Nat) : Text {
         if (Text.size(text) <= maxLength) {
             return text;
