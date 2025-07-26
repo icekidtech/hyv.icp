@@ -86,8 +86,20 @@ function App() {
       setIdentity(userIdentity);
       setIsAuthenticated(true);
 
-      // Use the correct local development host
-      const host = process.env.DFX_NETWORK === "local" ? "http://127.0.0.1:4943" : "https://ic0.app";
+      // Detect environment more precisely
+      const hostname = window.location.hostname;
+      const isPlayground = hostname.includes("raw.ic0.io") || hostname.includes("icp0.io");
+      const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
+      
+      // Set appropriate host based on environment
+      let host;
+      if (isPlayground) {
+        host = "https://icp-api.io"; // Playground API endpoint
+      } else if (isLocal) {
+        host = "http://127.0.0.1:4943";
+      } else {
+        host = "https://ic0.app";
+      }
       
       console.log("Creating agent with host:", host);
       
@@ -96,9 +108,9 @@ function App() {
         host: host
       });
       
-      // Only fetch root key in local development
-      if (process.env.DFX_NETWORK !== "ic") {
-        console.log("Fetching root key for local development");
+      // Fetch root key only in development or playground
+      if (isLocal || isPlayground) {
+        console.log("Fetching root key for development/playground");
         await agent.fetchRootKey();
       }
       

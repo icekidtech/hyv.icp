@@ -47,14 +47,17 @@ export default function InternetIdentityLogin({ onLogin }) {
     try {
       // Get the current hostname for the redirect URL
       const hostname = window.location.hostname;
-      const port = window.location.port ? `:${window.location.port}` : '';
-      const protocol = window.location.protocol;
-      
-      // Determine the identity provider URL based on environment
+      const isPlayground = hostname.includes("raw.ic0.io") || hostname.includes("icp0.io");
       const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
-      const identityProvider = isLocal 
-        ? `http://rdmx6-jaaaa-aaaaa-aaadq-cai.localhost:4943`
-        : "https://identity.ic0.app";
+
+      let identityProvider;
+      if (isPlayground) {
+        identityProvider = "https://identity.ic0.app"; // Use production identity for playground
+      } else if (isLocal) {
+        identityProvider = `http://rdmx6-jaaaa-aaaaa-aaadq-cai.localhost:4943`;
+      } else {
+        identityProvider = "https://identity.ic0.app";
+      }
 
       await new Promise((resolve, reject) => {
         authClient.login({
