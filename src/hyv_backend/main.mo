@@ -7,6 +7,7 @@ import Text "mo:base/Text";
 import Iter "mo:base/Iter";
 import Blob "mo:base/Blob";
 import Array "mo:base/Array";
+import Generator "canister:hyv_generator";
 
 actor Main {
   // Model marketplace types (moved from module to avoid non-static expression error)
@@ -70,6 +71,11 @@ actor Main {
     return Nat32.toText(hash);
   };
 
+  // Helper function to get the generator actor
+  private func getGeneratorActor() : async Generator.Generator {
+    return Generator;
+  };
+  
   // Updated function to generate and store synthetic data with API key
   public func generateAndStoreDataset(prompt: Text, apiKey: Text) : async DatasetId {
     let generator = await getGeneratorActor();
@@ -92,12 +98,6 @@ actor Main {
       
       return await uploadDataset(title, description, tags, fileHash, response);
     };
-  };
-
-  // Helper function to get the generator actor
-  private func getGeneratorActor() : async Generator {
-    let generatorCanisterId = "uzt4z-lp777-77774-qaabq-cai";
-    return actor(generatorCanisterId) : Generator;
   };
 
   // Public function to upload metadata for a new dataset

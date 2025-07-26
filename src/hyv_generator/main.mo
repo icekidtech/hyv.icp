@@ -9,7 +9,14 @@ import Time "mo:base/Time";
 import Int "mo:base/Int";
 import Iter "mo:base/Iter";
 
-actor Generator {
+public type Generator = actor {
+  generateSyntheticData: (prompt: Text, apiKey: Text) -> async Text;
+  generateText: (prompt: Text) -> async Text;
+  test: () -> async Text;
+  health: () -> async Text;
+};
+
+actor Generator : Generator {
     // HTTP request and response types for IC HTTP outcalls
     type HttpResponse = {
         status: Nat;
