@@ -223,9 +223,15 @@ function App() {
       
       // Fetch the generated dataset
       const generatedDataset = await backendActor.getDataset(newDatasetId);
-      if (generatedDataset.length > 0) {
+      console.log("Generated dataset:", generatedDataset); // Add debug logging
+      
+      // Add proper type checking before accessing
+      if (generatedDataset && Array.isArray(generatedDataset) && generatedDataset.length > 0) {
         setCurrentDataset(generatedDataset[0]);
         setShowDataModal(true);
+      } else {
+        console.error("Unexpected dataset format:", generatedDataset);
+        alert("Dataset generated but returned in unexpected format.");
       }
       
       alert(`✅ Successfully generated synthetic dataset with ID: ${newDatasetId}`);
@@ -266,16 +272,28 @@ function App() {
     }
   }
 
-  // Show loading spinner during initialization
+  // Show video loading screen during initialization
   if (isInitializing) {
     return (
       <div className="app-loading">
-        <div className="loading-spinner"></div>
-        <p>Initializing Hyv Marketplace...</p>
+        <div className="video-container">
+          <video 
+            autoPlay 
+            loop 
+            muted 
+            playsInline
+            className="loading-video"
+          >
+            <source src="/videos/hyv-loop.mp4" type="video/mp4" />
+            {/* Fallback for browsers that don't support video */}
+            <div className="loading-spinner"></div>
+            <p>Initializing Hyv Marketplace...</p>
+          </video>
+        </div>
       </div>
     );
   }
-
+  
   // Flow: Landing Page → Internet Identity Login → Main App Dashboard
   if (showLanding) {
     return <LandingPage onEnterApp={handleEnterApp} />;
@@ -490,19 +508,24 @@ function App() {
             </div>
             <div className="modal-body">
               <div className="dataset-info">
-                <h3><strong>📊 Dataset:</strong> {currentDataset.title}</h3>
-                <p><strong>📝 Description:</strong> {currentDataset.description}</p>
+                <h3><strong>📊 Dataset:</strong> {currentDataset.title || "Untitled Dataset"}</h3>
+                <p><strong>📝 Description:</strong> {currentDataset.description || "No description provided"}</p>
                 <div className="tags-container">
                   <strong>🏷️ Tags:</strong>
-                  {currentDataset.tags.map((tag, index) => (
-                    <span key={index} className="tag modal-tag">{tag}</span>
-                  ))}
+                  {Array.isArray(currentDataset.tags) ? 
+                    currentDataset.tags.map((tag, index) => (
+                      <span key={index} className="tag modal-tag">{tag}</span>
+                    )) : 
+                    <span>No tags available</span>
+                  }
                 </div>
-                <p><strong>🔐 Hash:</strong> <code>{currentDataset.fileHash}</code></p>
+                <p><strong>🔐 Hash:</strong> <code>{currentDataset.fileHash || "No hash available"}</code></p>
               </div>
               <div className="content-preview">
                 <h4><strong>📄 Generated Content:</strong></h4>
-                <pre className="code-preview synthetic-data">{currentDataset.content}</pre>
+                <pre className="code-preview synthetic-data">
+                  {typeof currentDataset.content === 'string' ? currentDataset.content : JSON.stringify(currentDataset.content, null, 2)}
+                </pre>
               </div>
               <div className="modal-actions">
                 <button 
