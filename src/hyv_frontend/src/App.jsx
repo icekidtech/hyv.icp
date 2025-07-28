@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { AuthClient } from "@dfinity/auth-client";
 import { HttpAgent, Actor } from "@dfinity/agent";
 import { hyv_backend } from "declarations/hyv_backend";
@@ -38,6 +38,22 @@ function App() {
 
   const [connectionStatus, setConnectionStatus] = useState("disconnected");
 
+  const [videoLoaded, setVideoLoaded] = useState(false);
+  const [videoError, setVideoError] = useState(false);
+  const videoRef = useRef(null);
+
+  // Force the app to wait for both initialization and video loading
+  const [readyToShow, setReadyToShow] = useState(false);
+  
+  useEffect(() => {
+    // Only mark ready when initialization completes AND video loads (or errors)
+    if (!isInitializing && (videoLoaded || videoError)) {
+      // Add a small delay for smoother transition
+      const timer = setTimeout(() => setReadyToShow(true), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isInitializing, videoLoaded, videoError]);
+
   // Initialize authentication on app load
   useEffect(() => {
     initializeAuth();
@@ -50,9 +66,13 @@ function App() {
     }
   }, [isAuthenticated]);
 
+  // Update the initialization function to load video assets
   const initializeAuth = async () => {
     try {
       console.log("Initializing authentication...");
+      // Load your video in parallel with auth
+      preloadVideo();
+      
       const client = await AuthClient.create({
         idleOptions: {
           idleTimeout: 1000 * 60 * 30, // 30 minutes
@@ -76,7 +96,13 @@ function App() {
     } catch (error) {
       console.error("Failed to initialize authentication:", error);
     } finally {
-      setIsInitializing(false);
+      // Only finish initializing if video has loaded or errored
+      if (videoLoaded || videoError) {
+        setIsInitializing(false);
+      } else {
+        // Set a timeout to prevent getting stuck on initialization
+        setTimeout(() => setIsInitializing(false), 5000);
+      }
     }
   };
 
@@ -272,31 +298,41 @@ function App() {
     }
   }
 
-  const [videoLoaded, setVideoLoaded] = useState(false);
+  // Preload video function
+  const preloadVideo = () => {
+    const video = new Image();
+    video.src = "/videos/hyv-loop.mp4";
+    console.log("Preloading video from:", video.src);
+  };
 
-  // Show video loading screen during initialization
-  if (isInitializing) {
+  // Show loading screen until ready to proceed
+  if (!readyToShow) {
     return (
       <div className="app-loading">
         <div className="video-container">
           <video 
+            ref={videoRef}
             autoPlay 
             loop 
             muted 
             playsInline
             className={`loading-video ${videoLoaded ? 'loaded' : ''}`}
-            onCanPlayThrough={() => setVideoLoaded(true)}
+            onCanPlayThrough={() => {
+              console.log("Video can play through");
+              setVideoLoaded(true);
+            }}
+            onError={(e) => {
+              console.error("Video loading error:", e);
+              setVideoError(true);
+            }}
           >
             <source src="/videos/hyv-loop.mp4" type="video/mp4" />
           </video>
           
-          {/* Show spinner until video loads */}
-          {!videoLoaded && (
-            <div className="fallback-loading">
-              <div className="loading-spinner"></div>
-              <p>Initializing Hyv Marketplace...</p>
-            </div>
-          )}
+          <div className="fallback-loading">
+            <div className="loading-spinner"></div>
+            <p>Initializing Hyv Marketplace...</p>
+          </div>
         </div>
       </div>
     );
