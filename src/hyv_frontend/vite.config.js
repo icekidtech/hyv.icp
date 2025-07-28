@@ -41,4 +41,5 @@ export default defineConfig({
     ],
     dedupe: ['@dfinity/agent'],
   },
+  assetsInclude: ['**/*.mp4'], // Ensure .mp4 files are handled as assets
 });
