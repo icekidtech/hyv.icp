@@ -272,6 +272,8 @@ function App() {
     }
   }
 
+  const [videoLoaded, setVideoLoaded] = useState(false);
+
   // Show video loading screen during initialization
   if (isInitializing) {
     return (
@@ -282,13 +284,19 @@ function App() {
             loop 
             muted 
             playsInline
-            className="loading-video"
+            className={`loading-video ${videoLoaded ? 'loaded' : ''}`}
+            onCanPlayThrough={() => setVideoLoaded(true)}
           >
             <source src="/videos/hyv-loop.mp4" type="video/mp4" />
-            {/* Fallback for browsers that don't support video */}
-            <div className="loading-spinner"></div>
-            <p>Initializing Hyv Marketplace...</p>
           </video>
+          
+          {/* Show spinner until video loads */}
+          {!videoLoaded && (
+            <div className="fallback-loading">
+              <div className="loading-spinner"></div>
+              <p>Initializing Hyv Marketplace...</p>
+            </div>
+          )}
         </div>
       </div>
     );
