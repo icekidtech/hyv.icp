@@ -724,6 +724,27 @@ body {
   text-align: center;
 }
 
+/* Video Loading Screen */
+.video-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+  background: linear-gradient(135deg, #09391A 0%, #0a4520 30%, #10692F 70%, #0d5025 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.loading-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* This will make the video cover the entire container */
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
   .content-grid {
