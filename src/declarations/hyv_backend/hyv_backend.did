@@ -1,0 +1,76 @@
+type RevenueShare = 
+ record {
+   creator: nat;
+   platform: nat;
+ };
+type PricingModel = record {usageBased: nat;};
+type ModelType = 
+ variant {
+   CNN;
+   DecisionTree;
+   Ensemble;
+   RNN;
+   Transformer;
+ };
+type ModelNFT = 
+ record {
+   fileChunks: vec blob;
+   id: nat;
+   metadata: ModelMetadata;
+   mintedAt: int;
+   owner: principal;
+   pricing: PricingModel;
+   revenue: RevenueShare;
+ };
+type ModelMetadata = 
+ record {
+   architecture: text;
+   description: text;
+   domain: Domain;
+   format: ModelFormat;
+   modelType: ModelType;
+   name: text;
+   parameters: nat;
+   performance: text;
+ };
+type ModelFormat = 
+ variant {
+   HuggingFace;
+   ONNX;
+   PyTorch;
+   TensorFlow;
+ };
+type Domain = 
+ variant {
+   Finance;
+   Healthcare;
+   NLP;
+   Other;
+   Vision;
+ };
+type DatasetId = nat;
+type Dataset = 
+ record {
+   content: text;
+   description: text;
+   fileHash: text;
+   id: nat;
+   tags: vec text;
+   title: text;
+   uploadDate: int;
+   uploader: principal;
+ };
+service : {
+  generateAndStoreDataset: (prompt: text, apiKey: text) -> (DatasetId);
+  getDataset: (id: DatasetId) -> (opt Dataset) query;
+  getModelNFT: (id: nat) -> (opt ModelNFT) query;
+  greet: (name: text) -> (text) query;
+  listDatasets: () -> (vec Dataset) query;
+  listModels: () -> (vec ModelNFT) query;
+  searchModels: (domain: opt Domain, modelType: opt ModelType, performance:
+   opt text) -> (vec ModelNFT) query;
+  uploadDataset: (title: text, description: text, tags: vec text, fileHash:
+   text, content: text) -> (DatasetId);
+  uploadModel: (metadata: ModelMetadata, fileChunks: vec blob, pricing:
+   PricingModel) -> (nat);
+}
