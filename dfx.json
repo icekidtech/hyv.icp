@@ -8,10 +8,22 @@
       "type": "motoko",
       "main": "src/hyv_generator/main.mo"
     },
+    "hyv_ai_engine": {
+      "type": "custom",
+      "build": "bash scripts/build_ai_engine.sh",
+      "wasm": "src/hyv_ai_engine/target/wasm32-wasi/release/hyv_ai_engine-ic.wasm",
+      "candid": "src/hyv_ai_engine/hyv_ai_engine.did",
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ]
+    },
     "hyv_frontend": {
       "dependencies": [
         "hyv_backend",
-        "hyv_generator"
+        "hyv_generator",
+        "hyv_ai_engine"
       ],
       "source": [
         "src/hyv_frontend/dist"
@@ -31,10 +43,7 @@
   "networks": {
     "local": {
       "bind": "127.0.0.1:4943",
-      "type": "ephemeral",
-      "replica": {
-        "subnet_type": "system"
-      }
+      "type": "ephemeral"
     }
   }
 }
