@@ -1,0 +1,6 @@
+service : {
+  generateSyntheticData: (prompt: text, apiKey: text) -> (text);
+  generateText: (prompt: text) -> (text);
+  health: () -> (text) query;
+  test: () -> (text) query;
+}
