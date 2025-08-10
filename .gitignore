@@ -1,25 +1,193 @@
-# Various IDEs and Editors
-.vscode/
-.idea/
-**/*~
+# Hyv AI Project .gitignore
 
-# Mac OSX temporary files
-.DS_Store
-**/.DS_Store
+# ===== PYTHON / ML LIBRARIES =====
+# Virtual environments
+hyv_ml_env/
+venv/
+env/
+ENV/
+.venv/
+.env/
+.python-version
 
-# dfx temporary files
-.dfx/
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 
-# generated files
-**/declarations/
+# Jupyter Notebook
+.ipynb_checkpoints
 
-# rust
+# PyTorch model files
+*.pth
+*.pt
+
+# HuggingFace cache
+.cache/
+~/.cache/huggingface/
+transformers_cache/
+
+# ===== AI MODELS =====
+# ONNX model files (these are large!)
+models/
+*.onnx
+*.onnx.data
+
+# Other model formats
+*.pkl
+*.h5
+*.hdf5
+*.safetensors
+*.bin
+
+# ===== RUST / CARGO =====
+# Rust build artifacts
 target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
 
-# frontend code
+# ===== INTERNET COMPUTER (ICP) =====
+# DFX build artifacts
+.dfx/
+dist/
 node_modules/
-#dist/
-.svelte-kit/
 
-# environment variables
+# Canister artifacts
+*.wasm
+*.wasm.gz
+*.did.js
+*.did.d.ts
+
+# ===== FRONTEND =====
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+build/
+#dist/
+.vite/
+
+# Environment files
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ===== DEVELOPMENT TOOLS =====
+# VS Code
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# ===== OPERATING SYSTEM =====
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ===== LOGS =====
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===== TEMPORARY FILES =====
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# Backup files
+*.backup
+*.bak
+*.orig
+
+# ===== CERTIFICATES & KEYS =====
+# SSL certificates
+*.pem
+*.key
+*.crt
+*.p12
+
+# ===== SCRIPTS OUTPUT =====
+# Script outputs
+scripts/output/
+converted_models/
+test_outputs/
+
+# ===== DOCUMENTATION =====
+# Generated docs
+docs/_build/
+site/
+
+# ===== PACKAGE MANAGERS =====
+# Yarn
+.yarn/
+.pnp.*
+
+# NPM
+package-lock.json
+
+# ===== PROJECT SPECIFIC =====
+# Large datasets for testing
+test_data/
+sample_datasets/
+benchmarks/
+
+# Deployment artifacts
+deployment/
+.deploy/
+
+# Local configuration
+local.config.json
+dev.config.json
+
+# Performance profiling
+*.prof
+perf.data*
+
+# ===== SECURITY =====
+# API keys and secrets (just in case)
+.secrets
+*.key
+secrets.json
+api_keys.txt
