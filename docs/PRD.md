@@ -1,8 +1,8 @@
-🧾 Product Requirements Document (PRD)
+# 🧾 Product Requirements Document (PRD)
 Product Name: Hyv
 Tagline: “Decentralized synthetic data marketplace for trustworthy AI.”
 Version: 1.0 MVP
-Prepared For: Tom Udoh
+Prepared For: Tom Udoh & Idopise Udoh
 Date: July 6, 2025
 
 🔥 1. Executive Summary
