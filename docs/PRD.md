@@ -5,10 +5,10 @@ Version: 1.0 MVP
 Prepared For: Tom Udoh & Idopise Udoh
 Date: July 6, 2025
 
-🔥 1. Executive Summary
+## 🔥 1. Executive Summary
 Hyv is a decentralized, token-incentivized synthetic data marketplace built entirely on the Internet Computer (ICP). It empowers users to generate, verify, license, and monetize AI-ready synthetic datasets — all on-chain. Leveraging ICP’s WebAssembly-based canisters, Chain Fusion interoperability, and verifiable data hashing, Hyv addresses the core problems of bias, opacity, and data scarcity in modern AI.
 
-🎯 2. Goals & Objectives
+## 🎯 2. Goals & Objectives
 ✅ Enable anyone to generate high-quality synthetic data using LLMs hosted on-chain.
 
 ✅ Allow contributors to upload synthetic datasets and verify their quality.
@@ -19,7 +19,7 @@ Hyv is a decentralized, token-incentivized synthetic data marketplace built enti
 
 ✅ Establish verifiable trails of dataset provenance using on-chain hashes + metadata.
 
-👥 3. Target Users
+## 👥 3. Target Users
 AI developers and startups needing clean, diverse, low-risk training data
 
 Data scientists and researchers in privacy-sensitive industries (e.g. finance, health)
@@ -28,8 +28,8 @@ Independent LLM builders who want transparent and verifiable data pipelines
 
 Contributors who generate or curate synthetic data and want to monetize it
 
-📌 4. Core Features
-A. 🧠 Synthetic Data Generator (TrustAI Engine)
+## 📌 4. Core Features
+### A. 🧠 Synthetic Data Generator (TrustAI Engine)
 Fully on-chain GPT-2 model for text generation (expandable to tabular/images in future)
 
 Prompt input field (UI) + metadata logs
@@ -38,7 +38,7 @@ Output saved in stable memory
 
 Outputs hashed and timestamped for proof
 
-B. 🧳 Dataset Upload & Verification
+### B. 🧳 Dataset Upload & Verification
 Upload JSON/CSV/TXT-based datasets
 
 Metadata includes:
@@ -57,7 +57,7 @@ Generates a verifiable hash (sha256) + timestamp
 
 Optional peer review before listing
 
-C. 🏪 Marketplace
+### C. 🏪 Marketplace
 Browse datasets with filters (domain, size, rating, etc.)
 
 Purchase with $HYV token
@@ -72,7 +72,7 @@ Verifiability details (hash, block, origin)
 
 Download access tied to NFT or license contract
 
-D. 🎯 Reputation & Incentives
+### D. 🎯 Reputation & Incentives
 Each contributor has a TrustScore based on:
 
 Peer reviews
