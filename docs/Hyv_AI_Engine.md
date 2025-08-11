@@ -29,8 +29,13 @@ The **Hyv AI Engine** is a Rust-based canister that hosts AI models on-chain for
 # Install Rust tools
 cargo install wasi2ic ic-file-uploader wasm-opt
 
+# Setup Python virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
 # Install Python dependencies
-pip install transformers torch onnx tokenizers
+pip install -r requirements.txt
+pip install transformers torch onnx tokenizers numpy
 
 # Verify dfx installation
 dfx --version
@@ -63,9 +68,16 @@ hyv_ai_engine/
 # Clone the project
 cd /path/to/hyv.icp
 
+# Setup Python virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install project dependencies
+pip install -r requirements.txt
+
 # Install development dependencies
 cargo install wasi2ic ic-file-uploader wasm-opt
-pip install transformers torch onnx tokenizers
+pip install transformers torch onnx tokenizers numpy
 
 # Create models directory
 mkdir -p models/
@@ -368,8 +380,11 @@ The AI Engine is part of the larger Hyv synthetic data marketplace:
 
 ```bash
 # Environment setup (Day 1)
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
 cargo install wasi2ic ic-file-uploader wasm-opt
-pip install transformers torch onnx tokenizers
+pip install transformers torch onnx tokenizers numpy
 
 # Create workspace
 mkdir -p src/hyv_ai_engine models/
