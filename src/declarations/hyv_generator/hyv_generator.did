@@ -1,6 +1,32 @@
+type TransformArgs = 
+ record {
+   context: blob;
+   response: HttpResponse;
+ };
+type HttpResponse = 
+ record {
+   body: blob;
+   headers: vec record {
+                  text;
+                  text;
+                };
+   status: nat;
+ };
+type HttpHeader = 
+ record {
+   name: text;
+   value: text;
+ };
+type CanisterHttpResponsePayload = 
+ record {
+   body: blob;
+   headers: vec HttpHeader;
+   status: nat;
+ };
 service : {
   generateSyntheticData: (prompt: text, apiKey: text) -> (text);
-  generateText: (prompt: text) -> (text);
   health: () -> (text) query;
   test: () -> (text) query;
+  testHttpCall: () -> (text);
+  transform: (raw: TransformArgs) -> (CanisterHttpResponsePayload) query;
 }

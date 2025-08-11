@@ -1,0 +1,27 @@
+type GenerationConfig = record {
+  max_tokens: nat32;
+  temperature: float32;
+  data_type: text;
+};
+
+type GenerationResult = record {
+  success: bool;
+  content: text;
+  error: opt text;
+};
+
+service : {
+    // Health and status
+    "health": () -> (text) query;
+    "status": () -> (text) query;
+    
+    // Model management
+    "clear_text_model_bytes": () -> ();
+    "clear_code_model_bytes": () -> ();
+    "append_text_model_bytes": (blob) -> ();
+    "append_code_model_bytes": (blob) -> ();
+    "setup_models": () -> (variant { Ok: text; Err: text });
+    
+    // AI generation
+    "generate_synthetic_data": (text, GenerationConfig) -> (GenerationResult);
+}

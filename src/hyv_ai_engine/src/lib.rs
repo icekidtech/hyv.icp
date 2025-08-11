@@ -1,4 +1,5 @@
 use candid::{CandidType, Deserialize};
+use ic_cdk_macros::*;
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager},
     DefaultMemoryImpl,
@@ -38,43 +39,43 @@ pub struct GenerationResult {
 }
 
 /// Health check function
-#[ic_cdk::query]
+#[query]
 fn health() -> String {
     "Hyv AI Engine v1.0 - Ready for synthetic data generation!".to_string()
 }
 
 /// Get engine status
-#[ic_cdk::query]
+#[query]
 fn status() -> String {
     "AI Engine Status: Initialized, awaiting model uploads".to_string()
 }
 
 /// Clear text model file for chunked upload
-#[ic_cdk::update]
+#[update]
 fn clear_text_model_bytes() {
     clear_model_file(TEXT_MODEL_FILE);
 }
 
 /// Clear code model file for chunked upload
-#[ic_cdk::update]
+#[update]
 fn clear_code_model_bytes() {
     clear_model_file(CODE_MODEL_FILE);
 }
 
 /// Append bytes to text model file
-#[ic_cdk::update]
+#[update]
 fn append_text_model_bytes(bytes: Vec<u8>) {
     append_model_bytes(TEXT_MODEL_FILE, bytes);
 }
 
 /// Append bytes to code model file
-#[ic_cdk::update]
+#[update]
 fn append_code_model_bytes(bytes: Vec<u8>) {
     append_model_bytes(CODE_MODEL_FILE, bytes);
 }
 
 /// Setup models after upload
-#[ic_cdk::update]
+#[update]
 fn setup_models() -> Result<String, String> {
     let mut loaded_count = 0;
     let mut errors = Vec::new();
@@ -115,7 +116,7 @@ fn setup_models() -> Result<String, String> {
 }
 
 /// Main generation function (placeholder for now)
-#[ic_cdk::update]
+#[update]
 async fn generate_synthetic_data(prompt: String, config: GenerationConfig) -> GenerationResult {
     // TODO: Implement actual model inference
     match config.data_type.as_str() {
@@ -195,7 +196,7 @@ fn post_upgrade() {
 }
 
 // Add a query function to check model status
-#[ic_cdk::query]
+#[query]
 fn get_loaded_models() -> Vec<String> {
     LOADED_MODELS.with(|models| {
         models.borrow().keys().cloned().collect()
