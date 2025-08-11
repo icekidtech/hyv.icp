@@ -23,78 +23,40 @@ def convert_distilgpt2():
     print("\n🔄 Converting DistilGPT-2...")
     print("=" * 50)
     
-    model_name = "distilgpt2"
-    
     try:
-        # Load model and tokenizer
-        print(f"📥 Loading {model_name}...")
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForCausalLM.from_pretrained(model_name)
-        config = AutoConfig.from_pretrained(model_name)
-        
-        print(f"📊 Model info:")
-        print(f"   - Parameters: ~{model.num_parameters() / 1e6:.1f}M")
-        print(f"   - Vocab size: {config.vocab_size}")
-        print(f"   - Max length: {config.max_position_embeddings}")
-        
-        # Add padding token if missing
-        if tokenizer.pad_token is None:
-            tokenizer.pad_token = tokenizer.eos_token
-            print("✅ Added padding token")
-        
-        # Prepare model for export - IMPORTANT: Disable use_cache to avoid past_key_values
-        model.eval()
-        model.config.use_cache = False
-        
-        # Create dummy input for ONNX export
-        dummy_text = "Generate synthetic data"
-        dummy_input = tokenizer(
-            dummy_text, 
-            return_tensors="pt", 
-            padding=True,
-            truncation=True,
-            max_length=32  # Shorter for simpler export
+        # Load with simplified configuration
+        model = AutoModelForCausalLM.from_pretrained(
+            "distilgpt2",
+            torchscript=True,
+            return_dict=False  # Add this
         )
+        model.eval()
         
-        print(f"🔧 Dummy input shape: {dummy_input.input_ids.shape}")
+        # Use a longer dummy input to avoid masking issues
+        dummy_input = torch.randint(0, 50257, (1, 10))  # Longer sequence
         
-        # Export to ONNX with simplified configuration
+        # Export with simpler parameters
         output_path = "models/distilgpt2.onnx"
-        print(f"💾 Exporting to {output_path}...")
-        
-        # Use only input_ids for simpler export
         torch.onnx.export(
             model,
-            dummy_input.input_ids,  # Only input_ids, no attention_mask
+            dummy_input,
             output_path,
             export_params=True,
-            opset_version=11,
-            do_constant_folding=True,
+            opset_version=14,  # Try newer opset
             input_names=["input_ids"],
-            output_names=["logits"],
-            dynamic_axes={
-                "input_ids": {0: "batch_size", 1: "sequence"},
-                "logits": {0: "batch_size", 1: "sequence"}
-            },
-            verbose=False
+            output_names=["logits"]
         )
         
-        # Check file size
+        # Check file size and return success
         size_mb = os.path.getsize(output_path) / (1024 * 1024)
         print(f"✅ DistilGPT-2 converted successfully!")
         print(f"📁 File: {output_path}")
         print(f"📊 Size: {size_mb:.1f} MB")
         
-        # Save tokenizer for testing
-        tokenizer.save_pretrained("models/distilgpt2_tokenizer")
-        print("💾 Tokenizer saved for testing")
-        
         return output_path, size_mb
         
     except Exception as e:
-        print(f"❌ Error converting DistilGPT-2: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ Error: {e}")
         return None, 0
 
 def convert_codet5():
