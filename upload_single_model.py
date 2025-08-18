@@ -1,60 +1,36 @@
 #!/usr/bin/env python3
 """
-Single Model Upload Script for Hyv AI Engine
-Uploads one model at a time with resume capability
+DistilGPT-2 Model Upload Script for Hyv AI Engine
+Uploads only the DistilGPT-2 model with resume capability
 """
 
 import os
 import subprocess
 import sys
 import json
-import glob
 from pathlib import Path
 
 # State tracking
 STATE_FILE = "upload_state.json"
+TARGET_MODEL = "distilgpt2.onnx"
 
-def list_available_models():
-    """List all ONNX models in the models directory"""
-    models_dir = "models"
-    if not os.path.exists(models_dir):
-        return []
-    
-    onnx_files = glob.glob(os.path.join(models_dir, "*.onnx"))
-    return [os.path.basename(f) for f in onnx_files]
-
-def get_model_config(model_name):
-    """Get upload configuration for each model"""
-    configs = {
-        "distilgpt2.onnx": {
-            "clear_func": "clear_text_model_bytes",
-            "append_func": "append_text_model_bytes",
-            "display_name": "DistilGPT-2",
-            "model_type": "text_model"
-        },
-        "codet5-small.onnx": {
-            "clear_func": "clear_code_model_bytes", 
-            "append_func": "append_code_model_bytes",
-            "display_name": "CodeT5-small",
-            "model_type": "code_model"
-        },
-        "gpt2_code.onnx": {
-            "clear_func": "clear_code_model_bytes",
-            "append_func": "append_code_model_bytes", 
-            "display_name": "GPT-2 Code",
-            "model_type": "code_model"
-        }
+def get_model_config():
+    """Get upload configuration for DistilGPT-2"""
+    return {
+        "clear_func": "clear_text_model_bytes",
+        "append_func": "append_text_model_bytes",
+        "display_name": "DistilGPT-2",
+        "model_type": "text_model"
     }
-    return configs.get(model_name)
 
-def save_upload_state(model_name, chunk_num, total_chunks):
+def save_upload_state(chunk_num, total_chunks):
     """Save current upload progress"""
     state = {}
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE, 'r') as f:
             state = json.load(f)
     
-    state[model_name] = {
+    state[TARGET_MODEL] = {
         "completed_chunks": chunk_num,
         "total_chunks": total_chunks
     }
@@ -62,7 +38,7 @@ def save_upload_state(model_name, chunk_num, total_chunks):
     with open(STATE_FILE, 'w') as f:
         json.dump(state, f)
 
-def get_upload_state(model_name):
+def get_upload_state():
     """Get previous upload progress"""
     if not os.path.exists(STATE_FILE):
         return 0, 0
@@ -70,8 +46,8 @@ def get_upload_state(model_name):
     with open(STATE_FILE, 'r') as f:
         state = json.load(f)
     
-    if model_name in state:
-        return state[model_name]["completed_chunks"], state[model_name]["total_chunks"]
+    if TARGET_MODEL in state:
+        return state[TARGET_MODEL]["completed_chunks"], state[TARGET_MODEL]["total_chunks"]
     return 0, 0
 
 def upload_model_chunk(chunk_data, function_name):
@@ -97,33 +73,28 @@ def upload_model_chunk(chunk_data, function_name):
         print(f"❌ Error: {e}")
         return False
 
-def upload_single_model(model_name, resume=True):
-    """Upload a single model with resume capability"""
-    file_path = os.path.join("models", model_name)
+def upload_distilgpt2(resume=True):
+    """Upload DistilGPT-2 model with resume capability"""
+    file_path = os.path.join("models", TARGET_MODEL)
     
     if not os.path.exists(file_path):
-        print(f"❌ Error: Model file {file_path} not found")
+        print(f"❌ Error: {TARGET_MODEL} not found in models/ directory")
+        print("💡 Run the model conversion script first to generate the ONNX model")
         return False
     
-    config = get_model_config(model_name)
-    if not config:
-        print(f"❌ Error: Unknown model configuration for {model_name}")
-        return False
+    config = get_model_config()
     
-    print(f"🔄 Uploading {config['display_name']} ({model_name})")
+    print(f"🔄 Uploading {config['display_name']} ({TARGET_MODEL})")
     print("=" * 60)
     
     # Check previous progress
-    completed_chunks, prev_total = get_upload_state(model_name)
+    completed_chunks, prev_total = get_upload_state()
     
     if completed_chunks > 0 and resume:
         print(f"🔄 Found previous upload: {completed_chunks} chunks completed")
-        resume_choice = input(f"Resume upload from chunk {completed_chunks + 1}? (y/n): ")
-        if resume_choice.lower() != 'y':
-            completed_chunks = 0
-    
-    # If starting fresh, clear existing data
-    if completed_chunks == 0:
+        print(f"🔄 Resuming upload from chunk {completed_chunks + 1}")
+    else:
+        # Clear existing data when starting fresh
         print(f"🧹 Clearing existing {config['display_name']} data...")
         result = subprocess.run(['dfx', 'canister', 'call', 'hyv_ai_engine', config['clear_func']], 
                               capture_output=True, text=True)
@@ -151,29 +122,27 @@ def upload_single_model(model_name, resume=True):
             
             if upload_model_chunk(chunk_data, config['append_func']):
                 print("✅")
-                save_upload_state(model_name, chunk_num, total_chunks)
+                save_upload_state(chunk_num, total_chunks)
             else:
                 print("❌")
-                print(f"❌ Failed at chunk {chunk_num}. Resume from here next time.")
+                print(f"❌ Failed at chunk {chunk_num}. Run script again to resume from here.")
                 return False
     
     # Clear state on successful completion
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE, 'r') as f:
             state = json.load(f)
-        if model_name in state:
-            del state[model_name]
+        if TARGET_MODEL in state:
+            del state[TARGET_MODEL]
         with open(STATE_FILE, 'w') as f:
             json.dump(state, f)
     
     print(f"✅ Successfully uploaded {config['display_name']}!")
     return True
 
-def setup_single_model(model_name):
-    """Setup a specific model after upload"""
-    config = get_model_config(model_name)
-    if not config:
-        return False
+def setup_distilgpt2():
+    """Setup DistilGPT-2 model after upload"""
+    config = get_model_config()
     
     print(f"🔧 Setting up {config['display_name']} in canister...")
     
@@ -196,38 +165,28 @@ def setup_single_model(model_name):
         return False
 
 def main():
-    print("🧠 Hyv AI Engine - Single Model Upload")
+    print("🧠 Hyv AI Engine - DistilGPT-2 Upload")
     print("=" * 60)
     
-    # List available models
-    available_models = list_available_models()
-    
-    if not available_models:
-        print("❌ No ONNX models found in models/ directory")
-        print("💡 Make sure to run the model conversion script first")
+    # Check if model file exists
+    model_path = os.path.join("models", TARGET_MODEL)
+    if not os.path.exists(model_path):
+        print(f"❌ {TARGET_MODEL} not found in models/ directory")
+        print("💡 Run the model conversion script first:")
+        print("   python scripts/convert_models.py")
         sys.exit(1)
     
-    print("📁 Available models:")
-    for i, model in enumerate(available_models, 1):
-        config = get_model_config(model)
-        display_name = config['display_name'] if config else model
-        print(f"   {i}. {display_name} ({model})")
-    
-    # For your specific request, default to distilgpt2
-    if "distilgpt2.onnx" in available_models:
-        print(f"\n🎯 Uploading DistilGPT-2 model as requested...")
-        model_to_upload = "distilgpt2.onnx"
-    else:
-        print("\n❌ distilgpt2.onnx not found in models directory")
-        print("📝 Available models:", available_models)
-        sys.exit(1)
+    # Show model info
+    file_size_mb = os.path.getsize(model_path) / (1024 * 1024)
+    print(f"📁 Found: {TARGET_MODEL} ({file_size_mb:.1f} MB)")
     
     # Upload the model
-    if upload_single_model(model_to_upload):
+    print(f"\n🚀 Starting DistilGPT-2 upload...")
+    if upload_distilgpt2():
         # Setup the model
-        if setup_single_model(model_to_upload):
+        if setup_distilgpt2():
             print("\n🎉 Upload and setup completed successfully!")
-            print("📝 You can now test the model with:")
+            print("📝 You can now test text generation with:")
             print("   dfx canister call hyv_ai_engine generate_text '(\"Hello world\")'")
         else:
             print("\n⚠️  Upload succeeded but setup failed")
