@@ -7,7 +7,7 @@ echo "🔨 Building Hyv AI Engine..."
 cd "$(dirname "$0")/.."
 
 # Ensure wasm32-wasi target is installed
-rustup target add wasm32-wasi
+rustup target add wasm32-wasip1
 
 # Navigate to the AI engine directory
 cd src/hyv_ai_engine
@@ -17,7 +17,7 @@ cargo clean
 
 # Build the Rust canister with verbose output
 echo "📦 Building Rust canister..."
-CARGO_TARGET_DIR=target cargo build --target wasm32-wasi --release --lib
+CARGO_TARGET_DIR=target cargo build --target wasm32-wasip1 --release --lib
 
 # Check if the build was successful
 if [ $? -ne 0 ]; then
@@ -26,12 +26,12 @@ if [ $? -ne 0 ]; then
 fi
 
 # Look for the WASM file
-WASM_FILE="target/wasm32-wasi/release/hyv_ai_engine.wasm"
+WASM_FILE="target/wasm32-wasip1/release/hyv_ai_engine.wasm"
 
 if [ ! -f "$WASM_FILE" ]; then
     echo "❌ WASM file not found at expected location: $WASM_FILE"
-    echo "📁 Contents of target/wasm32-wasi/release/:"
-    ls -la target/wasm32-wasi/release/ || echo "Directory does not exist"
+    echo "📁 Contents of target/wasm32-wasip1/release/:"
+    ls -la target/wasm32-wasip1/release/ || echo "Directory does not exist"
     
     # Try to find any .wasm files
     echo "🔍 Searching for any .wasm files:"
