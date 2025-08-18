@@ -30,31 +30,34 @@ WASM_FILE="target/wasm32-wasip1/release/hyv_ai_engine.wasm"
 
 if [ ! -f "$WASM_FILE" ]; then
     echo "❌ WASM file not found at expected location: $WASM_FILE"
-    echo "📁 Contents of target/wasm32-wasip1/release/:"
-    ls -la target/wasm32-wasip1/release/ || echo "Directory does not exist"
-    
-    # Try to find any .wasm files
-    echo "🔍 Searching for any .wasm files:"
-    find target -name "*.wasm" -type f || echo "No .wasm files found"
     exit 1
 fi
 
 echo "✅ Found WASM file: $WASM_FILE"
 
+# Go back to project root
+cd ../..
+
+# Create target directory structure if it doesn't exist
+mkdir -p target/wasm32-wasip1/release/
+
+# Copy WASM file to the location dfx expects
+cp "src/hyv_ai_engine/$WASM_FILE" "target/wasm32-wasip1/release/hyv_ai_engine.wasm"
+
 # Create IC-compatible WASM file
 if command -v wasi2ic >/dev/null 2>&1; then
     echo "🔄 Converting to IC-compatible WASM..."
-    wasi2ic "$WASM_FILE" "${WASM_FILE%.wasm}-ic.wasm"
+    wasi2ic "target/wasm32-wasip1/release/hyv_ai_engine.wasm" "target/wasm32-wasip1/release/hyv_ai_engine-ic.wasm"
     
-    if [ -f "${WASM_FILE%.wasm}-ic.wasm" ]; then
-        echo "✅ IC WASM file created: ${WASM_FILE%.wasm}-ic.wasm"
+    if [ -f "target/wasm32-wasip1/release/hyv_ai_engine-ic.wasm" ]; then
+        echo "✅ IC WASM file created: target/wasm32-wasip1/release/hyv_ai_engine-ic.wasm"
     else
         echo "❌ Failed to create IC WASM file"
         exit 1
     fi
 else
-    echo "⚠️  wasi2ic not found, copying original WASM file"
-    cp "$WASM_FILE" "${WASM_FILE%.wasm}-ic.wasm"
+    echo "⚠️  wasi2ic not found, using original WASM file"
 fi
 
 echo "🎉 Build completed successfully!"
+echo "📁 WASM file available at: target/wasm32-wasip1/release/hyv_ai_engine.wasm"
