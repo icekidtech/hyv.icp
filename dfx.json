@@ -11,7 +11,7 @@
     "hyv_ai_engine": {
       "type": "custom",
       "build": "bash scripts/build_ai_engine.sh",
-      "wasm": "src/hyv_ai_engine/target/wasm32-wasi/release/hyv_ai_engine-ic.wasm",
+      "wasm": "target/wasm32-wasip1/release/hyv_ai_engine-ic.wasm",
       "candid": "src/hyv_ai_engine/hyv_ai_engine.did",
       "metadata": [
         {
