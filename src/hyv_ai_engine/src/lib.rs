@@ -501,8 +501,5 @@ fn generate_intelligent_csv(prompt: &str, max_tokens: u32) -> String {
     generate_intelligent_text(prompt, max_tokens, 0.7)
 }
 
-// Instead of println!
-ic_cdk::println!("Debug message");
 
-// Or use the ic_cdk::api::print function
-ic_cdk::api::print("Debug message");
+
