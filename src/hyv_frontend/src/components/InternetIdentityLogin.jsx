@@ -55,7 +55,8 @@ export default function InternetIdentityLogin({ onLogin }) {
       let identityProvider;
       if (isLocal || isCanister) {
         // If running a local replica or on a canister, point to the local II canister hosted by the replica
-        identityProvider = `http://${window.location.hostname}:4943/?canisterId=u6s2n-gx777-77774-qaaba-cai`;
+        // Use localhost instead of 127.0.0.1 to comply with CSP policy
+        identityProvider = `http://localhost:4943/?canisterId=u6s2n-gx777-77774-qaaba-cai`;
       } else {
         identityProvider = "https://identity.ic0.app";
       }

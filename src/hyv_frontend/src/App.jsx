@@ -128,8 +128,8 @@ function App() {
       } else if (isLocal) {
         host = "http://127.0.0.1:4943";
       } else if (isCanister) {
-        // When running on a canister, use the local replica
-        host = "http://127.0.0.1:4943";
+        // When running on a canister, use localhost instead of 127.0.0.1 to comply with CSP
+        host = "http://localhost:4943";
       } else {
         host = "https://ic0.app";
       }
