@@ -45,6 +45,24 @@ type ModelFormat =
    PyTorch;
    TensorFlow;
  };
+type JobStatus = 
+ variant {
+   Completed;
+   Failed;
+   Pending;
+   Running;
+ };
+type JobId = nat;
+type GenerationJob = 
+ record {
+   config: text;
+   createdAt: int;
+   datasetId: opt nat;
+   id: JobId;
+   owner: principal;
+   prompt: text;
+   status: JobStatus;
+ };
 type Domain = 
  variant {
    Finance;
@@ -66,15 +84,19 @@ type Dataset =
    uploader: principal;
  };
 service : {
-  generateAndStoreDataset: (prompt: text, apiKey: text) -> (DatasetId);
+  generateAndStoreDataset: (prompt: text, _apiKey: text) -> (DatasetId);
   generateSyntheticData: (prompt: text, dataType: text) -> (Result);
   getDataset: (id: DatasetId) -> (opt Dataset) query;
+  getJob: (jobId: JobId) -> (opt GenerationJob) query;
   getModelNFT: (id: nat) -> (opt ModelNFT) query;
   greet: (name: text) -> (text) query;
   listDatasets: () -> (vec Dataset) query;
   listModels: () -> (vec ModelNFT) query;
+  listPendingJobs: () -> (vec GenerationJob) query;
+  markJobComplete: (jobId: JobId, datasetId: nat) -> (bool);
   searchModels: (domain: opt Domain, modelType: opt ModelType, performance:
    opt text) -> (vec ModelNFT) query;
+  submitGenerationJob: (prompt: text, config: text) -> (JobId);
   testAiConnection: () -> (Result);
   uploadDataset: (title: text, description: text, tags: vec text, fileHash:
    text, content: text) -> (DatasetId);

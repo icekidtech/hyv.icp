@@ -36,6 +36,195 @@ button[type=submit] {
   display: none;
 }
 
-.browser-warning {
-  display: none;
-}/*# sourceMappingURL=index.css.map */
+.job-status-display {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.job-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.job-id {
+  font-weight: 600;
+  color: #00d4ff;
+}
+
+.job-status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.status-submitting {
+  background: rgba(255, 193, 7, 0.2);
+  color: #ffc107;
+}
+
+.status-polling {
+  background: rgba(0, 123, 255, 0.2);
+  color: #007bff;
+}
+
+.status-completed {
+  background: rgba(40, 167, 69, 0.2);
+  color: #28a745;
+}
+
+.status-failed {
+  background: rgba(220, 53, 69, 0.2);
+  color: #dc3545;
+}
+
+.job-prompt-preview {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-style: italic;
+}
+
+/* Jobs List Styles */
+.jobs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.job-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.job-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.job-id {
+  font-weight: 600;
+  color: #00d4ff;
+}
+
+.job-prompt {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 8px;
+  font-style: italic;
+}
+
+.job-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.job-dataset {
+  color: #28a745;
+  font-weight: 500;
+}
+
+/* Modal Job Info */
+.job-info {
+  margin-top: 12px;
+  padding: 8px;
+  background: rgba(0, 212, 255, 0.1);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.job-info strong {
+  color: #00d4ff;
+}
+
+/* Connection Status Indicator */
+.connection-status {
+  margin-bottom: 12px;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.status-indicator.connected {
+  background: rgba(40, 167, 69, 0.2);
+  border: 1px solid rgba(40, 167, 69, 0.3);
+  color: #28a745;
+}
+
+.status-indicator.connecting {
+  background: rgba(255, 193, 7, 0.2);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  color: #ffc107;
+}
+
+.status-indicator.failed {
+  background: rgba(220, 53, 69, 0.2);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  color: #dc3545;
+}
+
+.status-indicator.disconnected {
+  background: rgba(108, 117, 125, 0.2);
+  border: 1px solid rgba(108, 117, 125, 0.3);
+  color: #6c757d;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.status-text {
+  font-weight: 500;
+}
+
+.retry-btn {
+  margin-left: 8px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  background: rgba(0, 123, 255, 0.2);
+  border: 1px solid rgba(0, 123, 255, 0.3);
+  color: #007bff;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.retry-btn:hover {
+  background: rgba(0, 123, 255, 0.3);
+  transform: translateY(-1px);
+}

@@ -37,7 +37,7 @@ export default function InternetIdentityLogin({ onLogin }) {
 
   const login = async () => {
     if (!authClient) {
-      setError("Authentication client not ready. Please try again.");
+      setError("Authentication client not ready. Please refresh the page.");
       return;
     }
 
@@ -47,19 +47,27 @@ export default function InternetIdentityLogin({ onLogin }) {
     try {
       // Get the current hostname for the redirect URL
       const hostname = window.location.hostname;
-      const isPlayground = hostname.includes("raw.ic0.io") || hostname.includes("icp0.io");
       const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+      const isCanister = hostname.includes('.localhost') || hostname.includes('.ic0.app');
 
+      // Use local replica identity provider for local development and canister deployments
+      // For production use the canonical identity provider
       let identityProvider;
-      if (isPlayground) {
-        identityProvider = "https://identity.ic0.app"; // Use production identity for playground
-      } else if (isLocal) {
-        identityProvider = `http://rdmx6-jaaaa-aaaaa-aaadq-cai.localhost:4943`;
+      if (isLocal || isCanister) {
+        // If running a local replica or on a canister, point to the local II canister hosted by the replica
+        identityProvider = `http://${window.location.hostname}:4943/?canisterId=u6s2n-gx777-77774-qaaba-cai`;
       } else {
         identityProvider = "https://identity.ic0.app";
       }
 
-      await new Promise((resolve, reject) => {
+      console.log("Starting login with provider:", identityProvider);
+
+      // Add timeout to prevent hanging
+      const loginPromise = new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error("Login timed out. Please try again."));
+        }, 30000); // 30 second timeout
+
         authClient.login({
           identityProvider,
           windowOpenerFeatures: 
@@ -67,21 +75,39 @@ export default function InternetIdentityLogin({ onLogin }) {
             `top=${window.screen.height / 2 - 705 / 2},` +
             `toolbar=0,location=0,menubar=0,width=525,height=705`,
           onSuccess: () => {
+            clearTimeout(timeout);
+            console.log("Login successful");
             const identity = authClient.getIdentity();
-            console.log("Login successful, identity:", identity.getPrincipal().toString());
             onLogin(identity);
             resolve();
           },
-          onError: (error) => {
-            console.error("Login failed:", error);
-            setError("Login failed. Please try again.");
-            reject(error);
+          onError: (err) => {
+            clearTimeout(timeout);
+            console.error("Login failed:", err);
+            const errorMessage = (err && err.message) ? err.message : String(err);
+
+            // Handle specific error types - auth client sometimes passes strings
+            if (errorMessage.includes("UserInterrupt") || errorMessage.includes("cancel")) {
+              setError("Login was cancelled. Please try again.");
+            } else {
+              setError(`Login failed: ${errorMessage}`);
+            }
+            reject(err);
           }
         });
       });
+
+      await loginPromise;
     } catch (error) {
       console.error("Authentication error:", error);
-      setError("Authentication failed. Please check your connection and try again.");
+      
+      // Handle known cancellation/error messages
+      const errMsg = (error && error.message) ? error.message : String(error);
+      if (errMsg.includes("UserInterrupt") || errMsg.includes("cancel")) {
+        setError("Login was cancelled. Please try again and complete the authentication process.");
+      } else {
+        setError(`Authentication failed: ${errMsg}`);
+      }
     } finally {
       setIsLoading(false);
     }

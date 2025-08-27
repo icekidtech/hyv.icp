@@ -12,7 +12,7 @@ import ModelSearch from "./components/ModelSearch";
 
 import "./index.css";
 
-const backendCanisterId = process.env.CANISTER_ID_HYV_BACKEND || "rdmx6-jaaaa-aaaaa-aaadq-cai";
+const backendCanisterId = "u6s2n-gx777-77774-qaaba-cai"; // Hardcoded for now to avoid env issues
 
 function App() {
   const [showLanding, setShowLanding] = useState(true);
@@ -31,10 +31,13 @@ function App() {
 
   const [models, setModels] = useState([]);
   const [searchParams, setSearchParams] = useState({});
-  const [generatedData, setGeneratedData] = useState(null);
-
-  const [showDataModal, setShowDataModal] = useState(false);
   const [currentDataset, setCurrentDataset] = useState(null);
+  const [showDataModal, setShowDataModal] = useState(false);
+
+  // Job-related state (was missing and caused runtime errors)
+  const [jobs, setJobs] = useState([]);
+  const [currentJob, setCurrentJob] = useState(null);
+  const [jobStatus, setJobStatus] = useState("idle");
 
   const [connectionStatus, setConnectionStatus] = useState("disconnected");
 
@@ -116,12 +119,16 @@ function App() {
       const hostname = window.location.hostname;
       const isPlayground = hostname.includes("raw.ic0.io") || hostname.includes("icp0.io");
       const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
+      const isCanister = hostname.includes(".localhost") || hostname.includes(".ic0.app");
       
       // Set appropriate host based on environment
       let host;
       if (isPlayground) {
         host = "https://icp-api.io"; // Playground API endpoint
       } else if (isLocal) {
+        host = "http://127.0.0.1:4943";
+      } else if (isCanister) {
+        // When running on a canister, use the local replica
         host = "http://127.0.0.1:4943";
       } else {
         host = "https://ic0.app";
@@ -134,9 +141,9 @@ function App() {
         host: host
       });
       
-      // Fetch root key only in development or playground
-      if (isLocal || isPlayground) {
-        console.log("Fetching root key for development/playground");
+      // Fetch root key only in development or when running on local replica
+      if (isLocal || isCanister) {
+        console.log("Fetching root key for local/canister environment");
         await agent.fetchRootKey();
       }
       
@@ -147,8 +154,27 @@ function App() {
       });
       
       console.log("Testing backend connection...");
-      // Test the connection
-      await actor.listDatasets();
+      // Test the connection with retry logic
+      let retries = 3;
+      let connected = false;
+      
+      while (retries > 0 && !connected) {
+        try {
+          const testResult = await actor.greet("Test connection");
+          console.log("Backend test result:", testResult);
+          connected = true;
+        } catch (error) {
+          console.warn(`Connection test failed (attempt ${4 - retries}/3):`, error);
+          retries--;
+          if (retries > 0) {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+          }
+        }
+      }
+      
+      if (!connected) {
+        throw new Error("Failed to connect to backend after 3 attempts");
+      }
       
       setBackendActor(actor);
       setConnectionStatus("connected");
@@ -156,6 +182,20 @@ function App() {
     } catch (error) {
       setConnectionStatus("failed");
       console.error("Failed to setup backend connection:", error);
+      
+      // Provide user-friendly error messages
+      let errorMessage = "Failed to connect to the backend. ";
+      if (error.message.includes("503")) {
+        errorMessage += "The service is temporarily unavailable. Please try again in a moment.";
+      } else if (error.message.includes("Failed to connect")) {
+        errorMessage += "Please check that your Internet Computer replica is running on port 4943.";
+      } else if (error.message.includes("fetchRootKey")) {
+        errorMessage += "Unable to fetch the root key. Please ensure you're in development mode.";
+      } else {
+        errorMessage += error.message || "Please check your connection and try again.";
+      }
+      
+      alert(`Connection Error: ${errorMessage}`);
     }
   };
 
@@ -187,14 +227,76 @@ function App() {
       setIsVisible(false);
       setDatasets([]);
       setModels([]);
-      setGeneratedData(null);
+      setJobs([]);
+      setCurrentJob(null);
+      setJobStatus("idle");
       setPrompt("");
-      setApiKey("");
       
       console.log("Logout complete - redirecting to landing page");
     } catch (error) {
       console.error("Error during logout:", error);
     }
+  };
+
+  // Poll job status until completion
+  const pollJobStatus = async (jobId) => {
+    const maxPolls = 60; // Maximum 5 minutes of polling
+    let pollCount = 0;
+
+    const poll = async () => {
+      try {
+        pollCount++;
+        console.log(`Polling job ${jobId} (attempt ${pollCount})`);
+
+        const job = await backendActor.getJob(jobId);
+
+        if (!job) {
+          console.error("Job not found");
+          setJobStatus("failed");
+          return;
+        }
+
+        console.log("Job status:", job.status);
+
+        // Update current job status
+        setCurrentJob({
+          ...currentJob,
+          status: Object.keys(job.status)[0].toLowerCase(),
+          datasetId: job.datasetId ? Number(job.datasetId) : null
+        });
+
+        if (job.status === "Completed" && job.datasetId) {
+          setJobStatus("completed");
+
+          // Fetch the generated dataset
+          const dataset = await backendActor.getDataset(Number(job.datasetId));
+          if (dataset) {
+            setCurrentDataset(dataset);
+            setShowDataModal(true);
+            fetchDatasets(); // Refresh dataset list
+          }
+
+          alert(`🎉 Job ${jobId} completed! Dataset generated successfully.`);
+          return;
+        } else if (job.status === "Failed") {
+          setJobStatus("failed");
+          alert(`❌ Job ${jobId} failed. Please try again.`);
+          return;
+        } else if (pollCount >= maxPolls) {
+          setJobStatus("failed");
+          alert(`⏰ Job ${jobId} timed out. The worker may be busy.`);
+          return;
+        }
+
+        // Continue polling
+        setTimeout(poll, 5000); // Poll every 5 seconds
+      } catch (error) {
+        console.error("Polling error:", error);
+        setJobStatus("failed");
+      }
+    };
+
+    poll();
   };
 
   // Data fetching functions
@@ -212,75 +314,90 @@ function App() {
     setLoading(false);
   };
 
+  const fetchJobs = async () => {
+    if (!backendActor) return;
+    try {
+      console.log("Fetching jobs...");
+      const result = await backendActor.listPendingJobs();
+      setJobs(result);
+      console.log("Jobs fetched:", result.length);
+    } catch (error) {
+      console.error("Failed to fetch jobs:", error);
+    }
+  };
+
   useEffect(() => {
     if (backendActor) {
       fetchDatasets();
+      fetchJobs();
     }
   }, [backendActor]);
 
   const handleGenerate = async (e) => {
     e.preventDefault();
-    
-    // Debug logging
-    console.log("Debug - backendActor:", !!backendActor);
-    console.log("Debug - prompt:", prompt, "Length:", prompt?.length || 0);
-    console.log("Debug - apiKey:", apiKey ? "PROVIDED" : "MISSING", "Length:", apiKey?.length || 0);
-    
-    // Improved validation
+
+    // Validation
     if (!backendActor) {
       alert("Backend connection not established. Please refresh the page and try again.");
       return;
     }
-    
+
     if (!prompt || !prompt.trim()) {
       alert("Please enter a prompt for data generation.");
       return;
     }
-    
-    if (!apiKey || !apiKey.trim()) {
-      alert("Please enter your OpenRouter API key.");
-      return;
-    }
-    
+
     setLoading(true);
+    setJobStatus("submitting");
+
     try {
-      console.log("Generating synthetic data with prompt:", prompt);
-      const newDatasetId = await backendActor.generateAndStoreDataset(prompt.trim(), apiKey.trim());
-      
-      // Fetch the generated dataset
-      const generatedDataset = await backendActor.getDataset(newDatasetId);
-      console.log("Generated dataset:", generatedDataset); // Add debug logging
-      
-      // Add proper type checking before accessing
-      if (generatedDataset && Array.isArray(generatedDataset) && generatedDataset.length > 0) {
-        setCurrentDataset(generatedDataset[0]);
-        setShowDataModal(true);
-      } else {
-        console.error("Unexpected dataset format:", generatedDataset);
-        alert("Dataset generated but returned in unexpected format.");
-      }
-      
-      alert(`✅ Successfully generated synthetic dataset with ID: ${newDatasetId}`);
+      console.log("Submitting generation job:", prompt);
+
+      // Submit job to off-chain worker queue
+      const config = JSON.stringify({
+        data_type: "text",
+        max_tokens: 100
+      });
+
+      const jobId = await backendActor.submitGenerationJob(prompt.trim(), config);
+      console.log("Job submitted with ID:", jobId);
+
+      // Set current job for tracking
+      setCurrentJob({
+        id: Number(jobId),
+        prompt: prompt.trim(),
+        config: config,
+        status: "pending",
+        createdAt: Date.now()
+      });
+
+      setJobStatus("polling");
+
+      // Start polling for job completion
+      pollJobStatus(jobId);
+
+      alert(`✅ Job submitted successfully with ID: ${jobId}\n\nThe off-chain worker will process your request. You'll be notified when it's complete.`);
+
       setPrompt("");
-      setApiKey("");
-      fetchDatasets();
     } catch (error) {
-      console.error("Generation failed:", error);
-      alert(`❌ Generation failed: ${error.message || "Unknown error"}. Please check your API key and try again.`);
+      console.error("Job submission failed:", error);
+      alert(`❌ Job submission failed: ${error.message || "Unknown error"}`);
+      setJobStatus("failed");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   // Model-related logic
   useEffect(() => {
     if (isAuthenticated && backendActor) {
-      hyv_backend.listModels().then(setModels).catch(console.error);
+      backendActor.listModels().then(setModels).catch(console.error);
     }
   }, [isAuthenticated, backendActor]);
 
   async function handleSearch(params) {
     try {
-      const results = await hyv_backend.searchModels(params.domain, params.modelType, params.performance);
+      const results = await backendActor.searchModels(params.domain, params.modelType, params.performance);
       setModels(results);
     } catch (error) {
       console.error("Search failed:", error);
@@ -289,7 +406,7 @@ function App() {
 
   async function handleUpload(id) {
     try {
-      const model = await hyv_backend.getModelNFT(id);
+      const model = await backendActor.getModelNFT(id);
       if (model) {
         setModels((prev) => [...prev, model]);
       }
@@ -373,6 +490,25 @@ function App() {
         </div>
         <div className="header-right">
           <div className="user-info">
+            <div className="connection-status">
+              <div className={`status-indicator ${connectionStatus}`}>
+                <div className="status-dot"></div>
+                <span className="status-text">
+                  {connectionStatus === "connected" && "🟢 Connected"}
+                  {connectionStatus === "connecting" && "🟡 Connecting..."}
+                  {connectionStatus === "failed" && "🔴 Connection Failed"}
+                  {connectionStatus === "disconnected" && "⚪ Disconnected"}
+                </span>
+              </div>
+              {connectionStatus === "failed" && (
+                <button 
+                  onClick={() => window.location.reload()} 
+                  className="btn btn-small retry-btn"
+                >
+                  🔄 Retry Connection
+                </button>
+              )}
+            </div>
             <div className="user-avatar">
               <span>🧠</span>
               <div className="avatar-pulse"></div>
@@ -414,36 +550,48 @@ function App() {
                     rows={4}
                   />
                   <small className="form-help">
-                    🤖 Describe the type of training data you need. Be specific about format, quantity, and use case.
+                    🤖 Describe the type of training data you need. Your job will be processed by our off-chain AI worker using local models.
                   </small>
                 </div>
-                <div className="form-group">
-                  <label htmlFor="apiKey">OpenRouter API Key</label>
-                  <input
-                    id="apiKey"
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="Enter your OpenRouter API key"
-                    className="input modern-input"
-                  />
-                  <small className="form-help">
-                    🔑 Get your API key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">OpenRouter.ai</a>
-                  </small>
-                </div>
+
+                {/* Job Status Display */}
+                {currentJob && (
+                  <div className="form-group">
+                    <label>Current Job Status</label>
+                    <div className="job-status-display">
+                      <div className="job-info">
+                        <span className="job-id">Job #{currentJob.id}</span>
+                        <span className={`job-status status-${jobStatus}`}>
+                          {jobStatus === "submitting" && "📤 Submitting..."}
+                          {jobStatus === "polling" && "⏳ Processing..."}
+                          {jobStatus === "completed" && "✅ Completed"}
+                          {jobStatus === "failed" && "❌ Failed"}
+                        </span>
+                      </div>
+                      <div className="job-prompt-preview">
+                        "{currentJob.prompt.substring(0, 50)}..."
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <button
                   onClick={handleGenerate}
-                  disabled={loading || !prompt.trim() || !apiKey.trim()}
+                  disabled={loading || !prompt.trim() || jobStatus === "polling"}
                   className="btn btn-primary btn-generate"
                 >
                   {loading ? (
                     <>
                       <div className="loading-spinner"></div>
-                      <span>Generating Synthetic Data...</span>
+                      <span>Submitting Job...</span>
+                    </>
+                  ) : jobStatus === "polling" ? (
+                    <>
+                      <div className="loading-spinner"></div>
+                      <span>Worker Processing...</span>
                     </>
                   ) : (
                     <>
-                      <span>🚀 Generate Training Data</span>
+                      <span>🚀 Submit Generation Job</span>
                       <div className="btn-glow"></div>
                     </>
                   )}
@@ -451,9 +599,53 @@ function App() {
               </div>
             </div>
 
-            {/* Model Upload */}
-            <div className="dashboard-card model-upload-card">
-              <ModelUpload onUpload={handleUpload} />
+            {/* Jobs List */}
+            <div className="dashboard-card jobs-card">
+              <div className="card-header">
+                <div className="card-icon">⚙️</div>
+                <div className="card-title-section">
+                  <h2 className="card-title">Generation Jobs</h2>
+                  <p className="card-subtitle">Track your AI generation requests</p>
+                </div>
+                <button onClick={fetchJobs} disabled={loading} className="btn btn-small refresh-btn">
+                  {loading ? (
+                    <div className="loading-spinner small"></div>
+                  ) : (
+                    "Refresh"
+                  )}
+                </button>
+              </div>
+              <div className="card-content">
+                {jobs.length > 0 ? (
+                  <div className="jobs-list">
+                    {jobs.map((job) => (
+                      <div key={Number(job.id)} className="job-card">
+                        <div className="job-header">
+                          <span className="job-id">Job #{Number(job.id)}</span>
+                          <span className={`job-status status-${Object.keys(job.status)[0].toLowerCase()}`}>
+                            {Object.keys(job.status)[0]}
+                          </span>
+                        </div>
+                        <p className="job-prompt">"{job.prompt.substring(0, 60)}..."</p>
+                        <div className="job-meta">
+                          <span className="job-date">
+                            {new Date(Number(job.createdAt)).toLocaleString()}
+                          </span>
+                          {job.datasetId && (
+                            <span className="job-dataset">Dataset #{Number(job.datasetId)}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-state">
+                    <div className="empty-icon">⚙️</div>
+                    <h3>No jobs found</h3>
+                    <p>Submit your first generation job to get started!</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -466,14 +658,14 @@ function App() {
                 <div className="stat-label">Datasets</div>
               </div>
               <div className="stat-card">
+                <div className="stat-icon">⚙️</div>
+                <div className="stat-value">{jobs.length}</div>
+                <div className="stat-label">Jobs</div>
+              </div>
+              <div className="stat-card">
                 <div className="stat-icon">🤖</div>
                 <div className="stat-value">{models.length}</div>
                 <div className="stat-label">AI Models</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-icon">⚡</div>
-                <div className="stat-value">99.9%</div>
-                <div className="stat-label">Uptime</div>
               </div>
             </div>
 
@@ -547,7 +739,7 @@ function App() {
         <div className="modal-overlay" onClick={() => setShowDataModal(false)}>
           <div className="modal-content enhanced-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>🎉 Synthetic Data Generated Successfully!</h2>
+              <h2>🎉 AI Generation Complete!</h2>
               <button onClick={() => setShowDataModal(false)} className="modal-close">×</button>
             </div>
             <div className="modal-body">
@@ -564,6 +756,13 @@ function App() {
                   }
                 </div>
                 <p><strong>🔐 Hash:</strong> <code>{currentDataset.fileHash || "No hash available"}</code></p>
+                {currentJob && (
+                  <div className="job-info">
+                    <strong>⚙️ Generated from Job:</strong> #{currentJob.id}
+                    <br />
+                    <strong>📝 Original Prompt:</strong> {currentJob.prompt}
+                  </div>
+                )}
               </div>
               <div className="content-preview">
                 <h4><strong>📄 Generated Content:</strong></h4>
