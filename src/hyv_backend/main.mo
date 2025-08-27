@@ -1,15 +1,28 @@
-import Time "mo:base/Time";
-import Principal "mo:base/Principal";
-import Map "mo:base/HashMap";
-import Nat "mo:base/Nat";
-import Nat32 "mo:base/Nat32";
+import Debug "mo:base/Debug";
+import Result "mo:base/Result";
 import Text "mo:base/Text";
+import Time "mo:base/Time";
+import Array "mo:base/Array";
+import HashMap "mo:base/HashMap";
 import Iter "mo:base/Iter";
 import Blob "mo:base/Blob";
-import Array "mo:base/Array";
+import Nat "mo:base/Nat";
+import Nat32 "mo:base/Nat32";
+import Principal "mo:base/Principal";
 import Generator "canister:hyv_generator";
+import Error "mo:base/Error"; // Add this import
 
-actor Main {
+actor HyvBackend = {
+    
+    // AI Engine canister reference (you'll need to update this with actual canister ID)
+    let aiEngine = actor("uxrrr-q7777-77774-qaaaq-cai") : actor {
+        generate_text: (Text) -> async Text;
+        generate_code: (Text) -> async Text;
+        generate_tabular: (Text) -> async Text;
+        health: () -> async Text;
+        get_loaded_models: () -> async [Text];
+    };
+
   // Model marketplace types (moved from module to avoid non-static expression error)
   public type ModelFormat = { #ONNX; #PyTorch; #TensorFlow; #HuggingFace };
   public type Domain = { #Healthcare; #Finance; #Vision; #NLP; #Other };
@@ -53,7 +66,7 @@ actor Main {
   public type DatasetId = Nat;
 
   private stable var nextId: Nat = 0;
-  private var datasets = Map.HashMap<DatasetId, Dataset>(0, Nat.equal, func(n: Nat) : Nat32 { Nat32.fromNat(n % (2**32)) });
+  private var datasets = HashMap.HashMap<DatasetId, Dataset>(0, Nat.equal, func(n: Nat) : Nat32 { Nat32.fromNat(n % (2**32)) });
 
   // Define stable state for models
   private stable var models: [ModelNFT] = [];
@@ -96,7 +109,9 @@ actor Main {
     fileHash: Text, 
     content: Text
   ) : async DatasetId {
-    let caller = Principal.fromActor(Main);
+    // Fix: Get the caller using message context instead of Main
+    let caller = Principal.fromActor(HyvBackend); // Use the actual actor name
+    // OR use: let caller = Principal.anonymousIdentity(); // for testing
     let timestamp = Time.now();
 
     let new_dataset: Dataset = {
@@ -142,7 +157,8 @@ actor Main {
     fileChunks: [Blob],
     pricing: PricingModel
   ) : async Nat {
-    let caller = Principal.fromActor(Main);
+    // Fix: Same issue here
+    let caller = Principal.fromActor(HyvBackend);
     let revenue = { creator = 70; platform = 30 };
     let id = nextModelId;
     nextModelId += 1;
@@ -193,5 +209,39 @@ actor Main {
         };
         
         result;
+    };
+
+    public func generateSyntheticData(prompt: Text, dataType: Text) : async Result.Result<Text, Text> {
+        try {
+            let result = switch (dataType) {
+                case ("text") {
+                    await aiEngine.generate_text(prompt)
+                };
+                case ("code") {
+                    await aiEngine.generate_code(prompt)
+                };
+                case ("tabular") {
+                    await aiEngine.generate_tabular(prompt)
+                };
+                case (_) {
+                    return #err("Unsupported data type: " # dataType)
+                };
+            };
+            #ok(result)
+        } catch (error) {
+            // Fix: Use Error.message instead of debug_show
+            #err("AI Engine error: " # Error.message(error))
+        }
+    };
+
+    public func testAiConnection() : async Result.Result<Text, Text> {
+        try {
+            let health = await aiEngine.health();
+            let models = await aiEngine.get_loaded_models();
+            #ok("AI Engine Status: " # health # "\nLoaded Models: " # debug_show(models))
+        } catch (error) {
+            // Fix: Use Error.message instead of debug_show
+            #err("Failed to connect to AI Engine: " # Error.message(error))
+        }
     };
 }

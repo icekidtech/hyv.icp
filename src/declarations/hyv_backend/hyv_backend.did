@@ -3,6 +3,11 @@ type RevenueShare =
    creator: nat;
    platform: nat;
  };
+type Result = 
+ variant {
+   err: text;
+   ok: text;
+ };
 type PricingModel = record {usageBased: nat;};
 type ModelType = 
  variant {
@@ -62,6 +67,7 @@ type Dataset =
  };
 service : {
   generateAndStoreDataset: (prompt: text, apiKey: text) -> (DatasetId);
+  generateSyntheticData: (prompt: text, dataType: text) -> (Result);
   getDataset: (id: DatasetId) -> (opt Dataset) query;
   getModelNFT: (id: nat) -> (opt ModelNFT) query;
   greet: (name: text) -> (text) query;
@@ -69,6 +75,7 @@ service : {
   listModels: () -> (vec ModelNFT) query;
   searchModels: (domain: opt Domain, modelType: opt ModelType, performance:
    opt text) -> (vec ModelNFT) query;
+  testAiConnection: () -> (Result);
   uploadDataset: (title: text, description: text, tags: vec text, fileHash:
    text, content: text) -> (DatasetId);
   uploadModel: (metadata: ModelMetadata, fileChunks: vec blob, pricing:

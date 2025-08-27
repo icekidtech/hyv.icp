@@ -8,7 +8,7 @@ name = "hyv_ai_engine"
 crate-type = ["cdylib"]
 
 [dependencies]
-ic-cdk = "0.14"
+ic-cdk = { version = "0.13", default-features = false }
 ic-cdk-macros = "0.9"
 candid = "0.10"
 tract-onnx = { git = "https://github.com/sonos/tract", rev = "2a2914ac29390cc08963301c9f3d437b52dd321a" }
