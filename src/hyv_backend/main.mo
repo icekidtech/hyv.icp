@@ -65,8 +65,26 @@ actor HyvBackend = {
 
   public type DatasetId = Nat;
 
+  // Job queue types for off-chain AI generation
+  public type JobId = Nat;
+  public type JobStatus = { #Pending; #Running; #Completed; #Failed };
+
+  public type GenerationJob = {
+    id: JobId;
+    owner: Principal;
+    prompt: Text;
+    config: Text; // JSON string for data_type, max_tokens, etc.
+    status: JobStatus;
+    createdAt: Int;
+    datasetId: ?Nat; // Link to final dataset when completed
+  };
+
   private stable var nextId: Nat = 0;
-  private var datasets = HashMap.HashMap<DatasetId, Dataset>(0, Nat.equal, func(n: Nat) : Nat32 { Nat32.fromNat(n % (2**32)) });
+  private transient var datasets = HashMap.HashMap<DatasetId, Dataset>(0, Nat.equal, func(n: Nat) : Nat32 { Nat32.fromNat(n % (2**32)) });
+
+  // Job queue stable state
+  private stable var pendingJobs: [GenerationJob] = [];
+  private stable var nextJobId: JobId = 0;
 
   // Define stable state for models
   private stable var models: [ModelNFT] = [];
@@ -141,6 +159,48 @@ actor HyvBackend = {
   // Get dataset by ID
   public query func getDataset(id: DatasetId) : async ?Dataset {
     datasets.get(id)
+  };
+
+  // --- Job Queue Functions for Off-Chain AI Generation ---
+
+  // Submit a new generation job
+  public func submitGenerationJob(prompt: Text, config: Text) : async JobId {
+    let caller = Principal.fromActor(HyvBackend);
+    let id = nextJobId;
+    nextJobId += 1;
+
+    let job: GenerationJob = {
+      id;
+      owner = caller;
+      prompt;
+      config;
+      status = #Pending;
+      createdAt = Time.now();
+      datasetId = null;
+    };
+
+    pendingJobs := Array.append(pendingJobs, [job]);
+    id
+  };
+
+  // List all pending jobs (for off-chain worker to poll)
+  public query func listPendingJobs() : async [GenerationJob] {
+    Array.filter<GenerationJob>(pendingJobs, func(j) { j.status != #Completed })
+  };
+
+  // Mark a job as completed and link to the generated dataset
+  public func markJobComplete(jobId: JobId, datasetId: Nat) : async Bool {
+    pendingJobs := Array.map<GenerationJob, GenerationJob>(pendingJobs, func(j) {
+      if (j.id == jobId) {
+        { j with status = #Completed; datasetId = ?datasetId }
+      } else { j }
+    });
+    true
+  };
+
+  // Get job by ID
+  public query func getJob(jobId: JobId) : async ?GenerationJob {
+    Array.find<GenerationJob>(pendingJobs, func(j) { j.id == jobId })
   };
 
   public query func greet(name : Text) : async Text {
