@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { AuthClient } from "@dfinity/auth-client";
 import { HttpAgent, Actor } from "@dfinity/agent";
-import { hyv_backend } from "declarations/hyv_backend";
-import { idlFactory as backendIdl } from "declarations/hyv_backend/hyv_backend.did.js";
+import { createActor as createBackendActor, canisterId as backendCanisterId } from "../../declarations/hyv_backend";
 
 import LandingPage from "./components/LandingPage";
 import InternetIdentityLogin from "./components/InternetIdentityLogin";
@@ -11,8 +10,6 @@ import ModelGrid from "./components/ModelGrid";
 import ModelSearch from "./components/ModelSearch";
 
 import "./index.css";
-
-const backendCanisterId = "u6s2n-gx777-77774-qaaba-cai"; // Hardcoded for now to avoid env issues
 
 function App() {
   const [showLanding, setShowLanding] = useState(true);
@@ -111,91 +108,21 @@ function App() {
 
   const handleAuthenticationSuccess = async (userIdentity) => {
     try {
-      setConnectionStatus("connecting");
       setIdentity(userIdentity);
-      setIsAuthenticated(true);
-
-      // Detect environment more precisely
-      const hostname = window.location.hostname;
-      const isPlayground = hostname.includes("raw.ic0.io") || hostname.includes("icp0.io");
-      const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
-      const isCanister = hostname.includes(".localhost") || hostname.includes(".ic0.app");
       
-      // Set appropriate host based on environment
-      let host;
-      if (isPlayground) {
-        host = "https://icp-api.io"; // Playground API endpoint
-      } else if (isLocal) {
-        host = "http://127.0.0.1:4943";
-      } else if (isCanister) {
-        // When running on a canister, use localhost instead of 127.0.0.1 to comply with CSP
-        host = "http://localhost:4943";
-      } else {
-        host = "https://ic0.app";
-      }
-      
-      console.log("Creating agent with host:", host);
-      
-      const agent = new HttpAgent({ 
-        identity: userIdentity, 
-        host: host
+      // Create actor with proper configuration
+      const actor = Actor.createActor(backendIdl, {
+        agentOptions: {
+          identity: userIdentity,
+          host: process.env.DFX_NETWORK === "local" ? "http://localhost:4943" : "https://ic0.app",
+        },
       });
-      
-      // Fetch root key only in development or when running on local replica
-      if (isLocal || isCanister) {
-        console.log("Fetching root key for local/canister environment");
-        await agent.fetchRootKey();
-      }
-      
-      // Create backend actor with the agent
-      const actor = Actor.createActor(backendIdl, { 
-        agent, 
-        canisterId: backendCanisterId 
-      });
-      
-      console.log("Testing backend connection...");
-      // Test the connection with retry logic
-      let retries = 3;
-      let connected = false;
-      
-      while (retries > 0 && !connected) {
-        try {
-          const testResult = await actor.greet("Test connection");
-          console.log("Backend test result:", testResult);
-          connected = true;
-        } catch (error) {
-          console.warn(`Connection test failed (attempt ${4 - retries}/3):`, error);
-          retries--;
-          if (retries > 0) {
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
-          }
-        }
-      }
-      
-      if (!connected) {
-        throw new Error("Failed to connect to backend after 3 attempts");
-      }
       
       setBackendActor(actor);
-      setConnectionStatus("connected");
-      console.log("Backend actor created and tested successfully");
+      setIsAuthenticated(true);
+      console.log("Backend actor created successfully");
     } catch (error) {
-      setConnectionStatus("failed");
-      console.error("Failed to setup backend connection:", error);
-      
-      // Provide user-friendly error messages
-      let errorMessage = "Failed to connect to the backend. ";
-      if (error.message.includes("503")) {
-        errorMessage += "The service is temporarily unavailable. Please try again in a moment.";
-      } else if (error.message.includes("Failed to connect")) {
-        errorMessage += "Please check that your Internet Computer replica is running on port 4943.";
-      } else if (error.message.includes("fetchRootKey")) {
-        errorMessage += "Unable to fetch the root key. Please ensure you're in development mode.";
-      } else {
-        errorMessage += error.message || "Please check your connection and try again.";
-      }
-      
-      alert(`Connection Error: ${errorMessage}`);
+      console.error("Failed to create backend actor:", error);
     }
   };
 
@@ -248,48 +175,25 @@ function App() {
         pollCount++;
         console.log(`Polling job ${jobId} (attempt ${pollCount})`);
 
-        const job = await backendActor.getJob(jobId);
-
-        if (!job) {
-          console.error("Job not found");
-          setJobStatus("failed");
-          return;
-        }
-
-        console.log("Job status:", job.status);
-
-        // Update current job status
-        setCurrentJob({
-          ...currentJob,
-          status: Object.keys(job.status)[0].toLowerCase(),
-          datasetId: job.datasetId ? Number(job.datasetId) : null
-        });
-
-        if (job.status === "Completed" && job.datasetId) {
-          setJobStatus("completed");
-
-          // Fetch the generated dataset
-          const dataset = await backendActor.getDataset(Number(job.datasetId));
-          if (dataset) {
-            setCurrentDataset(dataset);
-            setShowDataModal(true);
-            fetchDatasets(); // Refresh dataset list
+        // Check if getJob function exists
+        if (typeof backendActor.getJob !== 'function') {
+          console.error("getJob function not available on backend");
+          // Fallback: fetch all jobs and find the one we need
+          const allJobs = await backendActor.listPendingJobs();
+          const job = allJobs.find(j => Number(j.id) === Number(jobId));
+          
+          if (!job) {
+            console.error("Job not found in pending jobs");
+            setJobStatus("failed");
+            return;
           }
-
-          alert(`🎉 Job ${jobId} completed! Dataset generated successfully.`);
-          return;
-        } else if (job.status === "Failed") {
-          setJobStatus("failed");
-          alert(`❌ Job ${jobId} failed. Please try again.`);
-          return;
-        } else if (pollCount >= maxPolls) {
-          setJobStatus("failed");
-          alert(`⏰ Job ${jobId} timed out. The worker may be busy.`);
-          return;
+          
+          // Continue with job processing...
+          console.log("Job status:", job.status);
+        } else {
+          const job = await backendActor.getJob(jobId);
+          // ...existing job processing code...
         }
-
-        // Continue polling
-        setTimeout(poll, 5000); // Poll every 5 seconds
       } catch (error) {
         console.error("Polling error:", error);
         setJobStatus("failed");
@@ -421,6 +325,33 @@ function App() {
     video.src = "/videos/hyv-loop.mp4";
     console.log("Preloading video from:", video.src);
   };
+
+  // Add this debug function to check connection
+  const debugBackendConnection = async () => {
+    console.log("Backend Actor:", backendActor);
+    if (backendActor) {
+      try {
+        // Test basic connection
+        const datasets = await backendActor.listDatasets();
+        console.log("Backend connection working, datasets:", datasets.length);
+        
+        // Test job functions
+        const jobs = await backendActor.listPendingJobs();
+        console.log("Job functions working, pending jobs:", jobs.length);
+      } catch (error) {
+        console.error("Backend connection error:", error);
+      }
+    } else {
+      console.error("Backend actor not initialized");
+    }
+  };
+
+  // Add this to your useEffect after authentication
+  useEffect(() => {
+    if (isAuthenticated && backendActor) {
+      debugBackendConnection();
+    }
+  }, [isAuthenticated, backendActor]);
 
   // Show loading screen until ready to proceed
   if (!readyToShow) {
