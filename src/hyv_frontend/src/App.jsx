@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Actor, HttpAgent } from '@dfinity/agent';
 import { AuthClient } from '@dfinity/auth-client';
-// import { backendIdl } from '../../declarations/hyv_backend';
+import { idlFactory, canisterId as backendCanisterId } from '../../declarations/hyv_backend';
 import LandingPage from './components/LandingPage';
 import InternetIdentityLogin from './components/InternetIdentityLogin';
 import ModelSearch from './components/ModelSearch';
@@ -129,15 +129,45 @@ function App() {
     }
   };
 
+  // Updated handleAuthenticationSuccess function with runtime host detection and root key fetching
   const handleAuthenticationSuccess = async (userIdentity) => {
     try {
       setIdentity(userIdentity);
 
-      const actor = Actor.createActor(backendIdl, {
-        agentOptions: {
-          identity: userIdentity,
-          host: process.env.DFX_NETWORK === "local" ? "http://localhost:4943" : "https://ic0.app",
-        },
+      // Determine the host based on environment
+      const hostname = window.location.hostname;
+      const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+      const isCanister = hostname.includes('.localhost');
+      
+      let host;
+      if (isLocal || isCanister) {
+        host = "http://127.0.0.1:4943";
+      } else {
+        host = "https://ic0.app";
+      }
+
+      console.log("Creating agent with host:", host);
+
+      const agent = new HttpAgent({
+        identity: userIdentity,
+        host: host,
+      });
+
+      // CRITICAL: Always fetch root key for local development
+      if (isLocal || isCanister || process.env.DFX_NETWORK !== "ic") {
+        console.log("Fetching root key for local development...");
+        try {
+          await agent.fetchRootKey();
+          console.log("Root key fetched successfully");
+        } catch (rootKeyError) {
+          console.error("Failed to fetch root key:", rootKeyError);
+          throw new Error(`Root key fetch failed: ${rootKeyError.message}`);
+        }
+      }
+
+      const actor = Actor.createActor(idlFactory, {
+        agent,
+        canisterId: backendCanisterId,
       });
 
       setBackendActor(actor);
@@ -145,6 +175,8 @@ function App() {
       console.log("Backend actor created successfully");
     } catch (error) {
       console.error("Failed to create backend actor:", error);
+      // Show user-friendly error
+      alert(`Authentication setup failed: ${error.message}. Please try refreshing the page.`);
     }
   };
 

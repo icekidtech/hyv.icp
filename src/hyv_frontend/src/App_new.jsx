@@ -129,24 +129,47 @@ function App() {
     }
   };
 
-  const handleAuthenticationSuccess = async (userIdentity) => {
-    try {
-      setIdentity(userIdentity);
+const handleAuthenticationSuccess = async (userIdentity) => {
+  try {
+    setIdentity(userIdentity);
 
-      const actor = Actor.createActor(backendIdl, {
-        agentOptions: {
-          identity: userIdentity,
-          host: process.env.DFX_NETWORK === "local" ? "http://localhost:4943" : "https://ic0.app",
-        },
-      });
+    // Decide host at runtime (reliable in browser)
+    const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+    const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".localhost");
+    const host = isLocalHost ? "http://127.0.0.1:4943" : "https://ic0.app";
+    
 
-      setBackendActor(actor);
-      setIsAuthenticated(true);
-      console.log("Backend actor created successfully");
-    } catch (error) {
-      console.error("Failed to create backend actor:", error);
+    const agent = new HttpAgent({
+      identity: userIdentity,
+      host,
+    });
+
+    // For local replica: fetch root key so the agent can validate certificates
+    if (isLocalHost) {
+      try {
+        await agent.fetchRootKey();
+        console.log("Fetched root key for local replica");
+      } catch (err) {
+        console.warn("Failed to fetch root key (dev only):", err);
+      }
+    } else if (process.env.DFX_NETWORK !== "ic") {
+      // fallback for other non-IC networks if you rely on env var
+      try { await agent.fetchRootKey(); } catch (_) {}
     }
-  };
+
+    // Create actor with the agent and the backend canister id
+    const actor = Actor.createActor(idlFactory, {
+      agent,
+      canisterId: backendCanisterId,
+    });
+
+    setBackendActor(actor);
+    setIsAuthenticated(true);
+    console.log("Backend actor created successfully");
+  } catch (error) {
+    console.error("Failed to create backend actor:", error);
+  }
+};
 
   const handleEnterApp = () => {
     setShowLanding(false);

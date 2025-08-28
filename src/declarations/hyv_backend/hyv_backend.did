@@ -129,7 +129,7 @@ service : {
   getJob: (jobId: JobId) -> (opt GenerationJob) query;
   getModelNFT: (id: nat) -> (opt ModelNFT) query;
   greet: (name: text) -> (text) query;
-  http_request: (request: HttpRequest) -> (HttpResponse) query;
+  http_request: (_request: HttpRequest) -> (HttpResponse) query;
   listDatasets: () -> (vec Dataset) query;
   listModels: () -> (vec ModelNFT) query;
   listPendingJobs: () -> (vec GenerationJob) query;

@@ -303,7 +303,7 @@ public type StreamingCallbackHttpResponse = {
 };
 
 // Add HTTP request handler
-public query func http_request(request: HttpRequest) : async HttpResponse {
+public query func http_request(_request: HttpRequest) : async HttpResponse {
     {
         body = Text.encodeUtf8("Hyv Backend API - Use Candid interface for operations");
         headers = [("Content-Type", "text/plain")];
