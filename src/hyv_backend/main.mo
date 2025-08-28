@@ -8,6 +8,7 @@ import Blob "mo:base/Blob";
 import Nat "mo:base/Nat";
 import Nat32 "mo:base/Nat32";
 import Principal "mo:base/Principal";
+import Http "mo:http";
 
 persistent actor HyvBackend = {
     
@@ -266,4 +267,49 @@ persistent actor HyvBackend = {
         let jobCount = Array.size(pendingJobs);
         #ok("Off-chain worker system is operational. " # Nat.toText(jobCount) # " jobs in queue.")
     };
+
+    // HTTP types
+public type HttpRequest = {
+    body: Blob;
+    headers: [(Text, Text)];
+    method: Text;
+    url: Text;
+};
+
+public type HttpResponse = {
+    body: Blob;
+    headers: [(Text, Text)];
+    status_code: Nat16;
+    streaming_strategy: ?StreamingStrategy;
+};
+
+public type StreamingStrategy = {
+    #Callback: {
+        callback: StreamingCallback;
+        token: StreamingCallbackToken;
+    };
+};
+
+public type StreamingCallback = query (StreamingCallbackToken) -> async (StreamingCallbackHttpResponse);
+
+public type StreamingCallbackToken = {
+    content_encoding: Text;
+    index: Nat;
+    key: Text;
+};
+
+public type StreamingCallbackHttpResponse = {
+    body: Blob;
+    token: ?StreamingCallbackToken;
+};
+
+// Add HTTP request handler
+public query func http_request(request: HttpRequest) : async HttpResponse {
+    {
+        body = Text.encodeUtf8("Hyv Backend API - Use Candid interface for operations");
+        headers = [("Content-Type", "text/plain")];
+        status_code = 200;
+        streaming_strategy = null;
+    }
+};
 }
