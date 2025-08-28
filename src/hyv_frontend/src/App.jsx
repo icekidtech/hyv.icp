@@ -6,6 +6,8 @@ import LandingPage from './components/LandingPage';
 import InternetIdentityLogin from './components/InternetIdentityLogin';
 import ModelSearch from './components/ModelSearch';
 import ModelGrid from './components/ModelGrid';
+import Marketplace from './components/Marketplace';
+import GenerationPage from './components/GenerationPage';
 import './index.css';
 
 function App() {
@@ -18,6 +20,7 @@ function App() {
   // UI state
   const [showLanding, setShowLanding] = useState(true);
   const [showLogin, setShowLogin] = useState(false);
+  const [currentPage, setCurrentPage] = useState('marketplace'); // 'marketplace' or 'generation'
   const [isVisible, setIsVisible] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [readyToShow, setReadyToShow] = useState(false);
@@ -117,15 +120,64 @@ function App() {
         await handleAuthenticationSuccess(userIdentity);
         setShowLanding(false);
         setShowLogin(false);
+      } else {
+        // Allow viewing marketplace without authentication
+        await initializeBackendActor();
       }
     } catch (error) {
       console.error("Failed to initialize authentication:", error);
+      // Still allow marketplace viewing
+      await initializeBackendActor();
     } finally {
       if (videoLoaded || videoError) {
         setIsInitializing(false);
       } else {
         setTimeout(() => setIsInitializing(false), 5000);
       }
+    }
+  };
+
+  const initializeBackendActor = async () => {
+    try {
+      // Determine the host based on environment
+      const hostname = window.location.hostname;
+      const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+      const isCanister = hostname.includes('.localhost');
+      
+      let host;
+      if (isLocal || isCanister) {
+        host = "http://127.0.0.1:4943";
+      } else {
+        host = "https://ic0.app";
+      }
+
+      console.log("Creating agent with host:", host);
+
+      const agent = new HttpAgent({
+        identity: null, // Anonymous access for marketplace viewing
+        host: host,
+      });
+
+      // CRITICAL: Always fetch root key for local development
+      if (isLocal || isCanister || process.env.DFX_NETWORK !== "ic") {
+        console.log("Fetching root key for local development...");
+        try {
+          await agent.fetchRootKey();
+          console.log("Root key fetched successfully");
+        } catch (rootKeyError) {
+          console.error("Failed to fetch root key:", rootKeyError);
+        }
+      }
+
+      const actor = Actor.createActor(idlFactory, {
+        agent,
+        canisterId: backendCanisterId,
+      });
+
+      setBackendActor(actor);
+      console.log("Backend actor created successfully for anonymous access");
+    } catch (error) {
+      console.error("Failed to create backend actor:", error);
     }
   };
 
@@ -181,8 +233,13 @@ function App() {
   };
 
   const handleEnterApp = () => {
-    setShowLanding(false);
-    setShowLogin(true);
+  setShowLanding(false);
+  setCurrentPage('marketplace');
+  // Make the main app visible for anonymous users who 'enter' the marketplace
+  setIsVisible(true);
+  // Ensure we bypass the initial loading screen if user explicitly enters the marketplace
+  setIsInitializing(false);
+  setReadyToShow(true);
   };
 
   const handleLogin = async (userIdentity) => {
@@ -199,7 +256,6 @@ function App() {
       // Reset all state
       setIsAuthenticated(false);
       setIdentity(null);
-      setBackendActor(null);
       setShowLanding(true);
       setShowLogin(false);
       setIsVisible(false);
@@ -209,6 +265,7 @@ function App() {
       setCurrentJob(null);
       setJobStatus("idle");
       setPrompt("");
+      setCurrentPage('marketplace');
 
       console.log("Logout complete");
     } catch (error) {
@@ -373,6 +430,12 @@ function App() {
       return;
     }
 
+    if (!isAuthenticated) {
+      alert("❌ Please login to generate datasets. The marketplace is viewable without login, but generation requires authentication.");
+      setShowLogin(true);
+      return;
+    }
+
     if (!prompt || !prompt.trim()) {
       alert("❌ Please enter a prompt for data generation.");
       return;
@@ -458,6 +521,26 @@ function App() {
     }
   };
 
+  const handlePurchaseDataset = async (datasetId) => {
+    if (!isAuthenticated) {
+      alert("❌ Please login to purchase datasets.");
+      setShowLogin(true);
+      return;
+    }
+
+    try {
+      const result = await backendActor.purchaseDataset(datasetId);
+      if (result.ok) {
+        alert(`✅ ${result.ok}`);
+        await fetchDatasets(); // Refresh the datasets
+      } else {
+        alert(`❌ Purchase failed: ${result.err}`);
+      }
+    } catch (error) {
+      alert(`❌ Purchase failed: ${error.message}`);
+    }
+  };
+
   // Loading screen
   if (!readyToShow) {
     return (
@@ -521,6 +604,20 @@ function App() {
           </div>
         </div>
         <div className="header-right">
+          <nav className="nav-links">
+            <button
+              className={`nav-link ${currentPage === 'marketplace' ? 'active' : ''}`}
+              onClick={() => setCurrentPage('marketplace')}
+            >
+              Marketplace
+            </button>
+            <button
+              className={`nav-link ${currentPage === 'generation' ? 'active' : ''}`}
+              onClick={() => setCurrentPage('generation')}
+            >
+              Generate Data
+            </button>
+          </nav>
           <div className="user-info">
             <div className="connection-status">
               <div className={`status-indicator ${connectionStatus}`}>
@@ -549,367 +646,67 @@ function App() {
                 </button>
               )}
             </div>
-            <div className="user-avatar">
-              <span>🧠</span>
-              <div className="avatar-pulse"></div>
-            </div>
-            <div className="user-details">
-              <span className="user-greeting">Welcome back!</span>
-              <span className="user-status">
-                {identity ? `Principal: ${identity.getPrincipal().toString().slice(0, 8)}...` : 'Connected via Internet Identity'}
-              </span>
-            </div>
-            <button onClick={handleLogout} className="btn btn-secondary logout-btn">
-              <span>Logout</span>
-            </button>
+            {isAuthenticated ? (
+              <div className="user-avatar">
+                <span>🧠</span>
+                <div className="avatar-pulse"></div>
+              </div>
+            ) : (
+              <button onClick={() => setShowLogin(true)} className="btn btn-secondary login-btn">
+                <span>Login</span>
+              </button>
+            )}
+            {isAuthenticated && (
+              <>
+                <div className="user-details">
+                  <span className="user-greeting">Welcome back!</span>
+                  <span className="user-status">
+                    {identity ? `Principal: ${identity.getPrincipal().toString().slice(0, 8)}...` : 'Connected via Internet Identity'}
+                  </span>
+                </div>
+                <button onClick={handleLogout} className="btn btn-secondary logout-btn">
+                  <span>Logout</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
 
       {/* Main Content */}
       <main className="main-content">
-        <div className="content-grid">
-          <div className="left-section">
-            {/* Data Generation Card */}
-            <div className="dashboard-card generation-card">
-              <div className="card-header">
-                <div className="card-icon">🤖</div>
-                <div className="card-title-section">
-                  <h2 className="card-title">Generate Synthetic Data</h2>
-                  <p className="card-subtitle">Create AI-powered datasets with custom prompts</p>
-                </div>
-              </div>
-              <div className="card-content">
-                <div className="form-group">
-                  <label htmlFor="prompt">Synthetic Data Generation Prompt</label>
-                  <textarea
-                    id="prompt"
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Example: Generate 10 customer reviews for a coffee shop with ratings and sentiment..."
-                    className="textarea modern-input"
-                    rows={4}
-                  />
-                  <small className="form-help">
-                    🤖 Describe the type of training data you need. Your job will be processed by our off-chain AI worker using local models.
-                  </small>
-                </div>
-
-                {/* Job Status Display */}
-                {currentJob && (
-                  <div className="form-group">
-                    <label>Current Job Status</label>
-                    <div className="job-status-display">
-                      <div className="job-info">
-                        <div className="job-primary-info">
-                          <span className="job-id">Job #{currentJob.id}</span>
-                          <span className={`job-status status-${jobStatus}`}>
-                            {jobStatus === "submitting" && "📤 Submitting..."}
-                            {jobStatus === "polling" && "⏳ Processing..."}
-                            {jobStatus === "completed" && "✅ Completed"}
-                            {jobStatus === "failed" && "❌ Failed"}
-                          </span>
-                        </div>
-                        <div className="job-timing">
-                          <span className="job-created">
-                            Created: {new Date(currentJob.createdAt).toLocaleTimeString()}
-                          </span>
-                          {currentJob.updatedAt && currentJob.updatedAt !== currentJob.createdAt && (
-                            <span className="job-updated">
-                              Updated: {new Date(currentJob.updatedAt).toLocaleTimeString()}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="job-prompt-preview">
-                        <strong>Prompt:</strong> "{currentJob.prompt.length > 80
-                          ? currentJob.prompt.substring(0, 80) + '...'
-                          : currentJob.prompt}"
-                      </div>
-                      {currentJob.error && (
-                        <div className="job-error">
-                          <strong>Error:</strong> {currentJob.error}
-                        </div>
-                      )}
-                      {jobStatus === "polling" && (
-                        <div className="polling-indicator">
-                          <div className="loading-spinner small"></div>
-                          <span>AI worker is processing your request...</span>
-                          <button
-                            onClick={cancelCurrentJob}
-                            className="btn btn-small"
-                            style={{
-                              marginLeft: 'auto',
-                              background: 'rgba(239, 68, 68, 0.1)',
-                              border: '1px solid rgba(239, 68, 68, 0.2)',
-                              color: 'var(--error-color)'
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  onClick={handleGenerate}
-                  disabled={loading || !prompt.trim() || jobStatus === "polling"}
-                  className="btn btn-primary btn-generate"
-                >
-                  {loading ? (
-                    <>
-                      <div className="loading-spinner"></div>
-                      <span>Submitting Job...</span>
-                    </>
-                  ) : jobStatus === "polling" ? (
-                    <>
-                      <div className="loading-spinner"></div>
-                      <span>Worker Processing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>🚀 Submit Generation Job</span>
-                      <div className="btn-glow"></div>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Jobs List */}
-            <div className="dashboard-card jobs-card">
-              <div className="card-header">
-                <div className="card-icon">⚙️</div>
-                <div className="card-title-section">
-                  <h2 className="card-title">Generation Jobs</h2>
-                  <p className="card-subtitle">Track your AI generation requests</p>
-                </div>
-                <button onClick={fetchJobs} disabled={loading} className="btn btn-small refresh-btn">
-                  {loading ? (
-                    <div className="loading-spinner small"></div>
-                  ) : (
-                    "Refresh"
-                  )}
-                </button>
-              </div>
-              <div className="card-content">
-                {jobs.length > 0 ? (
-                  <div className="jobs-list">
-                    {jobs.map((job) => {
-                      const statusKey = Object.keys(job.status)[0];
-                      const isCompleted = statusKey === "Completed";
-                      const isFailed = statusKey === "Failed";
-                      const isRunning = statusKey === "Running";
-                      const isPending = statusKey === "Pending";
-
-                      return (
-                        <div key={Number(job.id)} className="job-card">
-                          <div className="job-header">
-                            <div className="job-title-section">
-                              <span className="job-id">Job #{Number(job.id)}</span>
-                              <span className={`job-status status-${statusKey.toLowerCase()}`}>
-                                {isPending && "⏳ Pending"}
-                                {isRunning && "⚙️ Running"}
-                                {isCompleted && "✅ Completed"}
-                                {isFailed && "❌ Failed"}
-                              </span>
-                            </div>
-                            <div className="job-actions">
-                              {isCompleted && job.datasetId && job.datasetId.length > 0 && (
-                                <button
-                                  className="btn btn-small btn-secondary"
-                                  onClick={async () => {
-                                    try {
-                                      const dataset = await backendActor.getDataset(Number(job.datasetId[0]));
-                                      if (dataset && dataset.length > 0) {
-                                        setCurrentDataset(dataset[0]);
-                                        setShowDataModal(true);
-                                      }
-                                    } catch (error) {
-                                      console.error("Error fetching dataset:", error);
-                                    }
-                                  }}
-                                >
-                                  👁️ View Dataset
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                          <p className="job-prompt">
-                            <strong>Prompt:</strong> {job.prompt.length > 100
-                              ? job.prompt.substring(0, 100) + '...'
-                              : job.prompt}
-                          </p>
-                          <div className="job-meta">
-                            <div className="job-details">
-                              <span className="job-date">
-                                📅 {new Date(Number(job.createdAt)).toLocaleString()}
-                              </span>
-                              {job.datasetId && job.datasetId.length > 0 && (
-                                <span className="job-dataset">
-                                  📊 Dataset #{Number(job.datasetId[0])}
-                                </span>
-                              )}
-                            </div>
-                            <div className="job-config">
-                              <span className="config-badge">
-                                {JSON.parse(job.config).data_type || 'text'}
-                              </span>
-                            </div>
-                          </div>
-                          {isFailed && job.status.Failed && (
-                            <div className="job-error-details">
-                              <strong>❌ Error:</strong> {job.status.Failed}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="empty-state">
-                    <div className="empty-icon">⚙️</div>
-                    <h3>No jobs found</h3>
-                    <p>Submit your first generation job to get started!</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="right-section">
-            {/* Stats Grid */}
-            <div className="stats-grid">
-              <div className="stat-card">
-                <div className="stat-icon">📊</div>
-                <div className="stat-value">{datasets.length}</div>
-                <div className="stat-label">Datasets</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-icon">⚙️</div>
-                <div className="stat-value">{jobs.length}</div>
-                <div className="stat-label">Jobs</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-icon">🤖</div>
-                <div className="stat-value">{models.length}</div>
-                <div className="stat-label">AI Models</div>
-              </div>
-            </div>
-
-            {/* Dataset List */}
-            <div className="dashboard-card marketplace-card">
-              <div className="card-header">
-                <div className="card-icon">🏪</div>
-                <div className="card-title-section">
-                  <h2 className="card-title">Marketplace Datasets</h2>
-                  <p className="card-subtitle">Browse and manage your AI-generated datasets</p>
-                </div>
-                <button onClick={fetchDatasets} disabled={loading} className="btn btn-small refresh-btn">
-                  {loading ? (
-                    <div className="loading-spinner small"></div>
-                  ) : (
-                    "🔄 Refresh"
-                  )}
-                </button>
-              </div>
-              <div className="card-content">
-                {datasets.length > 0 ? (
-                  <div className="dataset-grid">
-                    {datasets.map((dataset) => (
-                      <div
-                        key={Number(dataset.id)}
-                        className="dataset-card"
-                        onClick={() => {
-                          setCurrentDataset(dataset);
-                          setShowDataModal(true);
-                        }}
-                      >
-                        <div className="dataset-header">
-                          <h3 className="dataset-title">
-                            {dataset.title || `Dataset #${Number(dataset.id)}`}
-                          </h3>
-                          <div className="dataset-status verified">✓ Verified</div>
-                        </div>
-                        <p className="dataset-description">
-                          {dataset.description || "AI-generated synthetic dataset"}
-                        </p>
-                        <div className="dataset-meta">
-                          <div className="dataset-tags">
-                            {Array.isArray(dataset.tags) && dataset.tags.length > 0 ? (
-                              dataset.tags.slice(0, 3).map((tag, index) => (
-                                <span key={index} className="tag">{tag}</span>
-                              ))
-                            ) : (
-                              <span className="tag">synthetic-data</span>
-                            )}
-                            {Array.isArray(dataset.tags) && dataset.tags.length > 3 && (
-                              <span className="tag">+{dataset.tags.length - 3} more</span>
-                            )}
-                          </div>
-                          <div className="dataset-info">
-                            <div className="dataset-hash">
-                              ID: {Number(dataset.id)}
-                            </div>
-                            <div className="dataset-size">
-                              Size: {dataset.content ? dataset.content.length : 0} chars
-                            </div>
-                            <div className="dataset-date">
-                              {dataset.uploadDate ? new Date(Number(dataset.uploadDate)).toLocaleDateString() : 'Recent'}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="dataset-actions">
-                          <button
-                            className="btn btn-small btn-secondary"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setCurrentDataset(dataset);
-                              setShowDataModal(true);
-                            }}
-                          >
-                            👁️ View Details
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="empty-state">
-                    <div className="empty-icon">📦</div>
-                    <h3>No datasets found</h3>
-                    <p>Create your first AI-generated dataset using the form above to get started!</p>
-                    <div className="empty-actions">
-                      <button
-                        className="btn btn-primary"
-                        onClick={() => document.querySelector('.generation-card textarea')?.focus()}
-                      >
-                        🚀 Generate Dataset
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Model Search and Grid */}
-            <div className="dashboard-card models-card">
-              <div className="card-header">
-                <div className="card-icon">🔍</div>
-                <div className="card-title-section">
-                  <h2 className="card-title">AI Models</h2>
-                  <p className="card-subtitle">Discover and deploy AI models</p>
-                </div>
-              </div>
-              <div className="card-content">
-                <ModelSearch onSearch={handleSearch} />
-                <ModelGrid models={models} />
-              </div>
-            </div>
-          </div>
-        </div>
+        {currentPage === 'marketplace' ? (
+          <Marketplace
+            datasets={datasets}
+            loading={loading}
+            onRefresh={fetchDatasets}
+            onPurchaseDataset={handlePurchaseDataset}
+            onViewDataset={(dataset) => {
+              setCurrentDataset(dataset);
+              setShowDataModal(true);
+            }}
+            isAuthenticated={isAuthenticated}
+          />
+        ) : (
+          <GenerationPage
+            prompt={prompt}
+            setPrompt={setPrompt}
+            onGenerate={handleGenerate}
+            loading={loading}
+            currentJob={currentJob}
+            jobStatus={jobStatus}
+            onCancelJob={cancelCurrentJob}
+            jobs={jobs}
+            onRefreshJobs={fetchJobs}
+            onViewDataset={(dataset) => {
+              setCurrentDataset(dataset);
+              setShowDataModal(true);
+            }}
+            backendActor={backendActor}
+            isAuthenticated={isAuthenticated}
+            onLogin={() => setShowLogin(true)}
+          />
+        )}
       </main>
 
       {/* Generated Data Modal */}
@@ -917,13 +714,18 @@ function App() {
         <div className="modal-overlay" onClick={() => setShowDataModal(false)}>
           <div className="modal-content enhanced-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>🎉 AI Generation Complete!</h2>
+              <h2>🎉 Dataset Details</h2>
               <button onClick={() => setShowDataModal(false)} className="modal-close">×</button>
             </div>
             <div className="modal-body">
               <div className="dataset-info">
                 <h3><strong>📊 Dataset:</strong> {currentDataset.title || "Untitled Dataset"}</h3>
                 <p><strong>📝 Description:</strong> {currentDataset.description || "No description provided"}</p>
+                <div className="dataset-meta-info">
+                  <p><strong>💰 Price:</strong> {currentDataset.price} eICP</p>
+                  <p><strong>📥 Downloads:</strong> {currentDataset.downloads}</p>
+                  <p><strong>⭐ Rating:</strong> {currentDataset.rating}/100</p>
+                </div>
                 <div className="tags-container">
                   <strong>🏷️ Tags:</strong>
                   {Array.isArray(currentDataset.tags) ?
@@ -943,7 +745,7 @@ function App() {
                 )}
               </div>
               <div className="content-preview">
-                <h4><strong>📄 Generated Content:</strong></h4>
+                <h4><strong>📄 Content Preview:</strong></h4>
                 <pre className="code-preview synthetic-data">
                   {typeof currentDataset.content === 'string' ? currentDataset.content : JSON.stringify(currentDataset.content, null, 2)}
                 </pre>

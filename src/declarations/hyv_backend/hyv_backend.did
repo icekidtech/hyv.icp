@@ -115,14 +115,18 @@ type Dataset =
  record {
    content: text;
    description: text;
+   downloads: nat;
    fileHash: text;
    id: nat;
+   price: nat;
+   rating: nat;
    tags: vec text;
    title: text;
    uploadDate: int;
    uploader: principal;
  };
 service : {
+  callOpenAI: (prompt: text, _apiKey: text) -> (Result);
   generateAndStoreDataset: (prompt: text, _apiKey: text) -> (DatasetId);
   generateSyntheticData: (prompt: text, dataType: text) -> (Result);
   getDataset: (id: DatasetId) -> (opt Dataset) query;
@@ -134,6 +138,7 @@ service : {
   listModels: () -> (vec ModelNFT) query;
   listPendingJobs: () -> (vec GenerationJob) query;
   markJobComplete: (jobId: JobId, datasetId: nat) -> (bool);
+  purchaseDataset: (datasetId: DatasetId) -> (Result);
   searchModels: (domain: opt Domain, modelType: opt ModelType, performance:
    opt text) -> (vec ModelNFT) query;
   submitGenerationJob: (prompt: text, config: text) -> (JobId);
