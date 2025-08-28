@@ -50,18 +50,18 @@ export default function InternetIdentityLogin({ onLogin }) {
       const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
       const isCanister = hostname.includes('.localhost') || hostname.includes('.ic0.app');
 
-      // Use local replica identity provider for local development and canister deployments
-      // For production use the canonical identity provider
+      // Use environment variables or default Internet Identity canister ID
       let identityProvider;
       if (isLocal || isCanister) {
-        // If running a local replica or on a canister, point to the local II canister hosted by the replica
-        // Use localhost instead of 127.0.0.1 to comply with CSP policy
-        identityProvider = `http://localhost:4943/?canisterId=u6s2n-gx777-77774-qaaba-cai`;
+        // Use the actual Internet Identity canister ID from your deployment
+        const iiCanisterId = process.env.CANISTER_ID_INTERNET_IDENTITY || 'rdmx6-jaaaa-aaaaa-aaadq-cai';
+        console.log("Using II canister ID:", iiCanisterId);
+        identityProvider = `http://localhost:4943/?canisterId=${iiCanisterId}`;
       } else {
         identityProvider = "https://identity.ic0.app";
       }
 
-      console.log("Starting login with provider:", identityProvider);
+      console.log("Identity Provider URL:", identityProvider);
 
       // Add timeout to prevent hanging
       const loginPromise = new Promise((resolve, reject) => {

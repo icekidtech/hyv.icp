@@ -191,3 +191,4 @@ perf.data*
 *.key
 secrets.json
 api_keys.txt
+.mops

@@ -1,5 +1,9 @@
 {
   "canisters": {
+    "internet_identity": {
+      "type": "pull",
+      "id": "rdmx6-jaaaa-aaaaa-aaadq-cai"
+    },
     "hyv_backend": {
       "main": "src/hyv_backend/main.mo",
       "type": "motoko"
