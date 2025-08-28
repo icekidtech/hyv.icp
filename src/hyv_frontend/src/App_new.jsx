@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Actor, HttpAgent } from '@dfinity/agent';
 import { AuthClient } from '@dfinity/auth-client';
-// import { backendIdl } from '../../declarations/hyv_backend';
+import { backendIdl } from '../declarations/hyv_backend';
 import LandingPage from './components/LandingPage';
 import InternetIdentityLogin from './components/InternetIdentityLogin';
 import ModelSearch from './components/ModelSearch';

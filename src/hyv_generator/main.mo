@@ -9,7 +9,7 @@ import Time "mo:base/Time";
 import Int "mo:base/Int";
 import Iter "mo:base/Iter";
 
-actor Generator {
+persistent actor Generator {
     // HTTP request and response types for IC HTTP outcalls
     type HttpResponse = {
         status: Nat;
@@ -22,7 +22,7 @@ actor Generator {
         http_request : (HttpRequestArgs) -> async HttpResponse;
     };
 
-    let ic : IC = actor("aaaaa-aa");
+    stable let ic : IC = actor("aaaaa-aa");
 
     // Simplified helper function to escape JSON strings
     private func escapeJson(text: Text) : Text {

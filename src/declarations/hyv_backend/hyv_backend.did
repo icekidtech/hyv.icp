@@ -1,3 +1,22 @@
+type StreamingStrategy = variant {
+                           Callback:
+                            record {
+                              callback: StreamingCallback;
+                              token: StreamingCallbackToken;
+                            };};
+type StreamingCallbackToken = 
+ record {
+   content_encoding: text;
+   index: nat;
+   key: text;
+ };
+type StreamingCallbackHttpResponse = 
+ record {
+   body: blob;
+   token: opt StreamingCallbackToken;
+ };
+type StreamingCallback = func (StreamingCallbackToken) ->
+                          (StreamingCallbackHttpResponse) query;
 type RevenueShare = 
  record {
    creator: nat;
@@ -53,6 +72,26 @@ type JobStatus =
    Running;
  };
 type JobId = nat;
+type HttpResponse = 
+ record {
+   body: blob;
+   headers: vec record {
+                  text;
+                  text;
+                };
+   status_code: nat16;
+   streaming_strategy: opt StreamingStrategy;
+ };
+type HttpRequest = 
+ record {
+   body: blob;
+   headers: vec record {
+                  text;
+                  text;
+                };
+   method: text;
+   url: text;
+ };
 type GenerationJob = 
  record {
    config: text;
@@ -90,6 +129,7 @@ service : {
   getJob: (jobId: JobId) -> (opt GenerationJob) query;
   getModelNFT: (id: nat) -> (opt ModelNFT) query;
   greet: (name: text) -> (text) query;
+  http_request: (request: HttpRequest) -> (HttpResponse) query;
   listDatasets: () -> (vec Dataset) query;
   listModels: () -> (vec ModelNFT) query;
   listPendingJobs: () -> (vec GenerationJob) query;
